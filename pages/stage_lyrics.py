@@ -2,9 +2,7 @@ from openai import OpenAI
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
 
-from utils import sidebar
-
-openai_client = OpenAI()
+from utils import sidebar, get_openai_client
 
 TEMPLATE="""Write a nursery song for {topic},
 Remember to write one has very short intro and can hook interest in first 30 seconds.
@@ -21,8 +19,9 @@ def generate_lyrics(topic, extra_input=""):
         topic=topic,
         extra_input=extra_input
     )
+    client = get_openai_client()
     
-    response = openai_client.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[{"role": "user", "content": prompt}]
     )

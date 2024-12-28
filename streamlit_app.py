@@ -11,15 +11,6 @@ from streamlit_extras.switch_page_button import switch_page
 
 from utils import *
 
-# Initialize OpenAI client
-openai_client = OpenAI()
-
-STAGE_LYRICS = 1
-STAGE_SONG = 2
-STAGE_TIMESTAMP = 3
-STAGE_STORYBOARD = 4
-
-
 
 # [Previous template definitions remain the same]
 TEMPLATES = {
@@ -41,19 +32,6 @@ Remember to describe the looking feel of the character.
 The prompt is a {num_pages} page storyboard, with lyrics:
 {lyrics}"""
 }
-
-# [Previous function definitions remain the same]
-def generate_lyrics(topic, extra_input=""):
-    prompt = TEMPLATES['lyrics'].format(
-        topic=topic,
-        extra_input=extra_input
-    )
-    
-    response = openai_client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
 
 def main():
     sidebar()

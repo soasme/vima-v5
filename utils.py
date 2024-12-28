@@ -9,6 +9,9 @@ STAGE_SONG = 2
 STAGE_TIMESTAMP = 3
 STAGE_STORYBOARD = 4
 
+def get_openai_client():
+    return OpenAI(api_key=st.session_state.openai_key)
+
 def init_session_state():
     if 'stage' not in st.session_state:
         st.session_state.stage = 1

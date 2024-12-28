@@ -1,9 +1,6 @@
 import streamlit as st
-from openai import OpenAI
 
-from utils import sidebar
-
-openai_client = OpenAI()
+from utils import sidebar, get_openai_client
 
 TEMPLATE="""
 Write suno music style prompt in 200 characters.
@@ -26,6 +23,8 @@ def generate_song_style(lyrics, style):
         song_style=style,
     )
     
+    openai_client = get_openai_client()
+
     response = openai_client.chat.completions.create(
         model="gpt-4",
         messages=[{"role": "user", "content": prompt}]
