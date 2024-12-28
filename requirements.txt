@@ -1,1 +1,8 @@
 streamlit
+streamlit-extras
+openai
+moviepy
+whisper
+whisper-timestamped
+pyquery
+requests
