@@ -109,8 +109,9 @@ def sidebar():
             st.session_state.history = []
 
         st.header("Key Management")
+
         # TODO(Ju): keep it in localstorage https://pypi.org/project/streamlit-local-storage/
         env_openai_api_key = os.getenv("OPENAI_API_KEY")
-        openai_key = st.text_input("OpenAI API Key", type="password", value=env_openai_api_key)
+        openai_key = st.text_input("OpenAI API Key", type="password", value=env_openai_api_key or '')
         st.session_state.openai_key = openai_key
 
