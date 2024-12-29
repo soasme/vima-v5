@@ -3,7 +3,7 @@ from streamlit_extras.switch_page_button import switch_page
 import pyquery as pq
 import requests
 
-from utils import sidebar
+from vima5.utils import display_sidebar
 
 def extract_mp3_from_url(url):
     if not url:
@@ -17,8 +17,10 @@ def extract_mp3_from_url(url):
 def page_content():
     st.header("Stage 3: Generate Song")
 
-    st.write("TBD: Auto gen via https://suno.com is still in development.")
-    st.write("For now, you can manually generate the song url.")
+    st.write("Note: Auto gen via https://suno.com is still in development. For now, you can manually generate the song url.")
+    st.write("Step 1. Go to https://suno.com/create")
+    st.write("Step 2. Enter song title, song lyrics and song style and click Create button.")
+    st.write("Step 3. Keep generating until get satisfied song. Click share button to copy link. It has a form like this: https://suno.com/song/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
     song_url = st.text_input("Song URL", value=st.session_state.generated_content.get('song_url', ""))
     if st.button("Save Song URL"):
@@ -37,7 +39,7 @@ def page_content():
         st.audio(st.session_state.generated_content['song_mp3'], format='audio/mp3')
 
     if st.button("Continue to Stage 4: Segment Song"):
-        switch_page("stage_timestamp")
+        switch_page("stage_segment_song")
 
-sidebar()
+display_sidebar()
 page_content()

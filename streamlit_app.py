@@ -9,7 +9,7 @@ from openai import OpenAI
 from datetime import datetime
 from streamlit_extras.switch_page_button import switch_page
 
-from utils import *
+from vima5.utils import display_sidebar
 
 
 # [Previous template definitions remain the same]
@@ -34,7 +34,7 @@ The prompt is a {num_pages} page storyboard, with lyrics:
 }
 
 def main():
-    sidebar()
+    display_sidebar()
 
     st.markdown("""
     # 🎵 Kids Song Video Generator
@@ -51,6 +51,15 @@ def main():
     gen_song = st.button("Stage 3: Generate Song")
     if gen_song:
         switch_page("stage_gensong")
+
+    segment_song = st.button("Stage 4: Segment Song")
+    if segment_song:
+        switch_page("stage_segment_song")
+
+    gen_storyboard = st.button("Stage 5: Storyboard")
+    if gen_storyboard:
+        switch_page("stage_storyboard")
+
 
 
 

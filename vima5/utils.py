@@ -2,6 +2,7 @@ import os
 import json
 from streamlit_local_storage import LocalStorage
 from datetime import datetime
+from openai import OpenAI
 
 import streamlit as st
 
@@ -10,12 +11,18 @@ STAGE_SONG = 2
 STAGE_TIMESTAMP = 3
 STAGE_STORYBOARD = 4
 
-local_storage = LocalStorage()
-
 def get_openai_client():
     return OpenAI(api_key=st.session_state.openai_key)
 
 def init_session_state():
+    local_storage = LocalStorage()
+    previous_session = local_storage.getItem('session')
+    if previous_session:
+        previous_session = json.loads(previous_session)
+        st.session_state.generated_content = previous_session['generated_content']
+        st.session_state.history = previous_session['history']
+        st.session_state.stage = previous_session['stage']
+        st.session_state.user_input = previous_session['user_input']
     if 'stage' not in st.session_state:
         st.session_state.stage = 1
     if 'generated_content' not in st.session_state:
@@ -25,6 +32,8 @@ def init_session_state():
             'song_style': None,
             'song_url': None,
             'song_mp3': None,
+            'song_segmentation': None,
+            'song_vtt': None,
             'style_prompt': None,
             'song': None,
             'timestamps': None,
@@ -64,7 +73,20 @@ def update_session(generated_content=None, history=None, user_input=None):
     st.session_state.generated_content.update(generated_content or {})
     st.session_state.history.extend(history or [])
     st.session_state.user_input.update(user_input or {})
-    local_storage['session'] = save_session()
+
+    local_storage = LocalStorage()
+    local_storage.setItem('session', save_session()[0])
+
+
+def get_session(type, key):
+    if type == 'generated_content':
+        return st.session_state.generated_content.get(key)
+    elif type == 'history':
+        return st.session_state.history.get(key)
+    elif type == 'user_input':
+        return st.session_state.user_input.get(key)
+    else:
+        return None
     
 
 def load_session(file):
@@ -78,9 +100,7 @@ def load_session(file):
         st.session_state.generated_content = session_data['generated_content']
         st.session_state.history = session_data['history']
         st.session_state.stage = session_data['stage']
-        st.session_state.topic = session_data.get('topic', "")
-        st.session_state.topic_extra_input = session_data.get('topic_extra_input', "")
-        st.session_state.song_style = session_data.get('song_style', "")
+        st.session_state.user_input = session_data['user_input']
 
         return True
     except Exception as e:
@@ -98,6 +118,7 @@ def display_sidebar():
         uploaded_file = st.file_uploader("Import previous session", type=['json'])
         if uploaded_file is not None:
             if load_session(uploaded_file):
+                update_session()
                 st.success("Session loaded successfully!")
         
         # Export session
@@ -117,6 +138,8 @@ def display_sidebar():
                 'song_style': None,
                 'song_url': None,
                 'song_mp3': None,
+                'song_segmentation': None,
+                'song_srt': None,
                 'style_prompt': None,
                 'song': None,
                 'timestamps': None,
@@ -136,3 +159,4 @@ def display_sidebar():
         env_openai_api_key = os.getenv("OPENAI_API_KEY")
         openai_key = st.text_input("OpenAI API Key", type="password", value=env_openai_api_key or '')
         st.session_state.openai_key = openai_key
+

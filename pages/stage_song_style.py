@@ -1,6 +1,7 @@
 import streamlit as st
+from streamlit_extras.switch_page_button import switch_page
 
-from utils import sidebar, get_openai_client
+from vima5.utils import display_sidebar, get_openai_client
 
 TEMPLATE="""
 Write suno music style prompt in 200 characters.
@@ -34,26 +35,31 @@ def generate_song_style(lyrics, style):
 def page_content():
     st.header("Stage 2: Generate Song")
 
-    song_style = st.text_area("Song Style", value=st.session_state.song_style)
+    song_style = st.text_area("Song Style", value=st.session_state.user_input['song_style'])
 
-    if song_style != st.session_state.song_style:
-        st.session_state.song_style = song_style
+    if song_style != st.session_state.user_input['song_style']:
+        update_session(user_input={"song_style": song_style})
 
     if st.button("Generate Song Style"):
        with st.spinner("Generating song style..."):
-            song_style = generate_song_style(st.session_state.generated_content['lyrics'], st.session_state.song_style)
-            st.session_state.generated_content['song_style'] = song_style
-            st.session_state.history.append({"stage": "song_style", "content": song_style})
+            song_style = generate_song_style(
+                    st.session_state.generated_content['lyrics'],
+                    st.session_state.user_input['song_style']
+            )
+            update_session(
+                generated_content={"song_style": song_style},
+                history=[{"stage": "song_style", "content": song_style}]
+            )
             st.success("Song Style generated!")
 
     if st.session_state.generated_content['song_style']:
         st.text_area("Generated Song Style", st.session_state.generated_content['song_style'], height=300)
 
         if st.button("Continue to Stage 3: Generate Song"):
-            st.write("TBD")
+            switch_page("stage_gensong")
 
 
 
-sidebar()
+display_sidebar()
 page_content()
 
