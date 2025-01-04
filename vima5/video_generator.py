@@ -80,8 +80,9 @@ class VideoTrack:
             text,
             fontsize=40,
             color='white',
-            size=self.resolution
-        ).set_duration(self.end_time - self.start_time)
+            size=self.resolution,
+            duration=self.end_time - self.start_time
+        )
         
         clip = clip.set_position(self._get_position(position))
         return clip
@@ -98,11 +99,10 @@ class VideoTrack:
         if not os.path.exists(full_image_path):
             raise FileNotFoundError(f"Image file not found: {full_image_path}")
             
-        clip = VideoFileClip(full_image_path)
+        clip = VideoFileClip(full_image_path, duration=self.end_time - self.start_time)
         
         # Scale the clip
         clip = clip.resize(scale)
-        clip = clip.set_duration(self.end_time - self.start_time)
         clip = clip.set_position(self._get_position(position))
         
         return clip
@@ -156,7 +156,7 @@ class VideoGenerator:
 
             # Create base clip with background color
             max_duration = max(track.end_time for track in self.tracks)
-            base_clip = ColorClip(self.resolution, color=(0, 0, 0)).set_duration(max_duration)
+            base_clip = ColorClip(self.resolution, color=(0, 0, 0), duration=max_duration)
 
             # Combine all clips
             self.final_clip = CompositeVideoClip(
