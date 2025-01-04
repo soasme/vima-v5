@@ -3,7 +3,7 @@ import json
 import os
 from typing import List, Dict, Tuple
 import numpy as np
-from moviepy.editor import (
+from moviepy import (
     ColorClip,
     TextClip,
     VideoFileClip,
