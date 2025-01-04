@@ -1,4 +1,5 @@
 import streamlit as st
+import traceback
 import json
 import os
 import tempfile
@@ -31,7 +32,7 @@ def generate_video(schema: Dict, preview_resolution: str, download_resolution: s
                 asset_dir=".",  # Use current directory for assets
                 out_dir=temp_dir
             )
-            preview_generator.tracks = [VideoTrack(track_data, '480p', temp_dir) for track_data in schema]
+            preview_generator.load_schema_object(schema)
             preview_generator.generate()
             preview_generator.save("preview.mp4")
             preview_generator.cleanup()
@@ -42,7 +43,7 @@ def generate_video(schema: Dict, preview_resolution: str, download_resolution: s
                 asset_dir=".",  # Use current directory for assets
                 out_dir=temp_dir
             )
-            download_generator.tracks = [VideoTrack(track_data, '1080p', temp_dir) for track_data in schema]
+            download_generator.load_schema_object(schema)
             download_generator.generate()
             download_generator.save("download.mp4")
             download_generator.cleanup()
@@ -56,7 +57,8 @@ def generate_video(schema: Dict, preview_resolution: str, download_resolution: s
             return preview_data, download_data
             
         except Exception as e:
-            st.error(f"Error generating video: {str(e)}")
+            st.error(f"Error generating video: {str(e)}\n")
+            print(traceback.format_exc())
             return None, None
 
 def main():
@@ -71,7 +73,7 @@ def main():
         "order": 0,
         "parameters": {
             "page_duration": 2,
-            "hex_colors": ["#FF0000", "#00FF00", "#0000FF"]
+            "hex_colors": ["##FFD700", "#87CEEB", "#FF69B4", "#32CD32", "#FFA500"]
         }
     },
     {
