@@ -99,11 +99,11 @@ class VideoTrack:
         if not os.path.exists(full_image_path):
             raise FileNotFoundError(f"Image file not found: {full_image_path}")
             
-        clip = VideoFileClip(full_image_path, duration=self.end_time - self.start_time)
+        clip = VideoFileClip(full_image_path, position=self._get_position(position), duration=self.end_time - self.start_time)
         
         # Scale the clip
         clip = clip.resize(scale)
-        clip = clip.set_position(self._get_position(position))
+
         
         return clip
 
