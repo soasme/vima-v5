@@ -157,7 +157,7 @@ class VideoGenerator:
 
             # Create base clip with background color
             max_duration = max(track.end_time for track in self.tracks)
-            base_clip = ColorClip(self.resolution, color=(256, 256, 256), duration=max_duration)
+            base_clip = ColorClip(self.resolution, color=(255, 255, 255), duration=max_duration)
 
             # Combine all clips
             self.final_clip = CompositeVideoClip(
