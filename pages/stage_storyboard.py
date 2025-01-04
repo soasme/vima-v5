@@ -17,7 +17,7 @@ You should avoid mentioning "kids" or "children" or asking to show any text in t
 Always describe the looking feel of the character and the camera movement and style.
 Be nice to sora: Don't use too complicated character actions, keep it simple like jumping, running, swimming, etc.
 Remember, we are making a kids song video, so the storyboard should be simple and easy to understand, with a lot of visual cues, and the character should be cute and charming, with a lot of expressions, and the background should be colorful and vibrant.
-Always start from 0s.
+Always start from 0s and the following storyboard should use relative time from the previous storyboard.
 Format as a list of multiple storyboard prompts. Each storyboard prompt should be separated as Start, End, Visual Style, Scene Description, Camera Movement, Character Action, and Character Expression.
 
 Song title: {song_title}
@@ -42,6 +42,7 @@ def generate_storyboard(song_title, song_extra, lyrics):
 
 def page_content():
     st.header("Stage 5: Storyboard")
+    st.write("This stage is deprecated...")
 
     song_title = get_session('user_input', 'topic')
     song_extra = get_session('user_input', 'topic_extra_input')

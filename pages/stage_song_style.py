@@ -10,6 +10,7 @@ Each item is no more than three words.
 Use your brain to list instruments for a catchy tune.
 Only format those words separated by comma without any helpful information.
 Include user input if provided.
+Always include "Partygrip style music, nursery rhyme, robotic sound, high pitch, energetic" in the output.
 
 User Input:
 {song_style}
@@ -53,7 +54,9 @@ def page_content():
             st.success("Song Style generated!")
 
     if st.session_state.generated_content['song_style']:
-        st.text_area("Generated Song Style", st.session_state.generated_content['song_style'], height=300)
+        st.write("### Generated Song Style")
+        st.write(st.session_state.generated_content['song_style'])
+        st.code(st.session_state.generated_content['song_style'])
 
         if st.button("Continue to Stage 3: Generate Song"):
             switch_page("stage_gensong")

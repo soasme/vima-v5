@@ -37,7 +37,9 @@ def main():
     display_sidebar()
 
     st.markdown("""
-    # 🎵 Kids Song Video Generator
+    # 🎵 @CoofyKids Video Maker 🎵
+
+    This application is a tool to help you generate a catchy kids song and generate a video for the song.
     """)
 
     gen_lyrics = st.button("Stage 1: Generate Lyrics")
@@ -56,9 +58,9 @@ def main():
     if segment_song:
         switch_page("stage_segment_song")
 
-    gen_storyboard = st.button("Stage 5: Storyboard")
-    if gen_storyboard:
-        switch_page("stage_storyboard")
+    #gen_storyboard = st.button("Stage 5: Storyboard")
+    #if gen_storyboard:
+    #    switch_page("stage_storyboard")
 
 
 

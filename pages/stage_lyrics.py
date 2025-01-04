@@ -4,14 +4,33 @@ from streamlit_extras.switch_page_button import switch_page
 
 from vima5.utils import display_sidebar, get_openai_client, update_session
 
-TEMPLATE="""Write a nursery song for {topic},
-Remember to write one has very short intro and can hook interest in first 30 seconds.
-Use some meaningless but catchy sound in chorus.
-Use a lot of repetitions.
-Has a strcucture of intro-verse1-chorus-verse2-chorus-bridge-chorus-outtro.
-Use simple words.
-Ideal length is 2min.
-Format verse, chorus, bridge, etc with square brackets.
+STRUCTURES = [
+        "intro-verse1-chorus-verse2-chorus-bridge-chorus-outtro",
+        "intro-chorus-verse-chorus-outtro",
+]
+
+TEMPLATE="""Write a nursery song for {topic}.
+
+* Remember to write one has very short intro and can hook interest in first 10 seconds.
+* Song length is 1 min only.
+* Use a lot of repetitions.
+* Use lots of lots of repeat and catchy words.
+* Use some meaningless but catchy sound in chorus.
+* Has a strcucture of intro-chorus-verse-chorus-outtro.
+* Use simple words.
+* Format verse, chorus, bridge, etc with square brackets.
+* Fast-paced, energetic songs with catchy electronic beats
+* Humorous lyrics with unexpected twists and punchlines
+* Mix of silly and "earworm" qualities that make songs memorable
+* Character voices and sound effects that enhance entertainment value.
+* Combination of real facts with absurd elements.
+* Strong hooks that hit within first 3-5 seconds.
+* Memorable catchphrases that kids will want to repeat.
+* Clean humor that parents approve of but isn't "babyish".
+* High-energy vocals with distinct character voices.
+* Simple but catchy choruses that stick in viewers' heads.
+* Make it fun and hilarious.
+
 {extra_input}"""
 
 def generate_lyrics(topic, extra_input=""):
@@ -37,7 +56,7 @@ def page_content():
     # Update state variables when input changes
     if topic != st.session_state.user_input['topic'] or topic_extra_input != st.session_state.user_input['topic_extra_input']:
         update_session(user_input={"topic": topic, "topic_extra_input": topic_extra_input})
-    
+
     if st.button("Generate Lyrics"):
         with st.spinner("Generating lyrics..."):
             lyrics = generate_lyrics(
@@ -55,6 +74,13 @@ def page_content():
     
         if st.button("Continue to Next Stage: Generate Song Style"):
             switch_page("stage_song_style")
+
+    st.divider()
+    st.write("### Prompt for OpenAI")
+    st.code(f"""
+{TEMPLATE.format(topic=st.session_state.user_input['topic'], extra_input=st.session_state.user_input['topic_extra_input'])}
+    """)
+
 
 
 display_sidebar()

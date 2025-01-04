@@ -9,6 +9,15 @@ from whisper_timestamped.make_subtitles import write_vtt
 
 from vima5.utils import display_sidebar, update_session, get_session
 
+def parse_timestamp(timestamp: str, decimal_marker: str = '.'):
+    parts = timestamp.split(':')
+    assert len(parts) == 3, "timestamp should have 3 parts"
+    hours, minutes, seconds = parts
+    hours = int(hours)
+    minutes = int(minutes)
+    seconds, milliseconds = map(int, seconds.split(decimal_marker))
+    return (hours * 3_600) + (minutes * 60) + seconds + (milliseconds / 1000)
+
 def format_timestamp(seconds: float, always_include_hours: bool = False, decimal_marker: str = '.'):
     assert seconds >= 0, "non-negative timestamp expected"
     milliseconds = round(seconds * 1000.0)
@@ -29,12 +38,14 @@ def write_srt(result):
     srt = []
     for i, segment in enumerate(result, start=1):
         # write srt lines
-        srt.append(
-            f"{i}\n"
-            f"{format_timestamp(segment['start'], always_include_hours=True, decimal_marker=',')} --> "
-            f"{format_timestamp(segment['end'], always_include_hours=True, decimal_marker=',')}\n"
-            f"{segment['text'].strip().replace('-->', '->')}",
-        )
+        srt.append({
+            'index': i+1,
+            'start': format_timestamp(segment['start'], always_include_hours=True, decimal_marker=','),
+            'start_seconds': segment['start'],
+            'end': format_timestamp(segment['end'], always_include_hours=True, decimal_marker=','),
+            'end_seconds': segment['end'],
+            'text': segment['text'].strip().replace('-->', '->')
+        })
     return srt
 
 
@@ -77,23 +88,42 @@ def page_content():
     if st.button("Autofix Lyrics"):
         st.success("Lyrics autofixed!")
 
-    if st.button("Continue to Next Stage: Generate Storyboard"):
-        switch_page("stage_storyboard")
+    for idx, line in enumerate(get_session('generated_content', 'song_srt')):
+        with st.form(f"form_{idx}"):
+            start, end, text = line['start'], line['end'], line['text']
+            new_range = st.slider(f"Range_{idx}", min_value=0.0, max_value=150.0, value=(line['start_seconds'], line['end_seconds']))
+            new_start, new_end = new_range
+            new_lyric = st.text_input(f"Lyric_{idx}", value=text)
 
-    col_srt, col2_lyrics = st.columns(2)
+            st.audio(get_session('generated_content', 'song_mp3'), format='audio/mp3', start_time=new_start, end_time=new_end, loop=True)
 
-    srt = get_session('generated_content', 'song_srt')
-    new_srt = col_srt.text_area('SRT Subtitle', value='\n'.join(srt), height=len(srt)*16)
+            submitted = st.form_submit_button("Submit")
+            if submitted:
+                srt = get_session('generated_content', 'song_srt')
+                srt[idx] = {
+                    'index': idx+1,
+                    'start': format_timestamp(new_start, always_include_hours=True, decimal_marker=','),
+                    'start_seconds': new_start,
+                    'end': format_timestamp(new_end, always_include_hours=True, decimal_marker=','),
+                    'end_seconds': new_end,
+                    'text': new_lyric,
+                }
+                ## update start and start_seconds for idx+1 if exists.
+                if idx+1 < len(srt):
+                    srt[idx+1]['start_seconds'] = new_end
+                    srt[idx+1]['start'] = format_timestamp(new_end, always_include_hours=True, decimal_marker=',')
+                ## Update end and end_seconds for idx-1 if exists.
+                if idx-1 >= 0:
+                    srt[idx-1]['end_seconds'] = new_start
+                    srt[idx-1]['end'] = format_timestamp(new_start, always_include_hours=True, decimal_marker=',')
 
-    if new_srt != '\n'.join(srt):
-        update_session(generated_content={'song_srt': new_srt.splitlines()})
 
-    col2_lyrics.text_area('Original Lyrics', value=get_session('generated_content', 'lyrics') or '', height=16*len(get_session('generated_content', 'lyrics').splitlines()))
+                update_session(generated_content={'song_srt': srt})
 
     st.divider()
 
     st.header("Whisper Transcription")
-    st.write(get_session('generated_content', 'song_segmentation'))
+    st.write(get_session('generated_content', 'song_srt'))
 
 
 
