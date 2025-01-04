@@ -65,7 +65,7 @@ class VideoTrack:
                 if duration <= 0:
                     break
                     
-                clip = ColorClip(self.resolution, color).set_duration(duration)
+                clip = ColorClip(self.resolution, color, duration)
                 clips.append(clip)
                 current_time += duration
                 
