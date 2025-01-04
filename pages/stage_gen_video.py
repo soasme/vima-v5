@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 from typing import Dict, Optional
-from video_generator import VideoGenerator  # Import from previous file
+from vima5.video_generator import VideoGenerator  # Import from previous file
 
 def validate_schema(schema_str: str) -> Optional[Dict]:
     """Validate and parse JSON schema."""
