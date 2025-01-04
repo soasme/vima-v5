@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 from typing import Dict, Optional
-from vima5.video_generator import VideoGenerator  # Import from previous file
+from vima5.video_generator import VideoGenerator, VideoTrack  # Import from previous file
 
 def validate_schema(schema_str: str) -> Optional[Dict]:
     """Validate and parse JSON schema."""
@@ -31,7 +31,7 @@ def generate_video(schema: Dict, preview_resolution: str, download_resolution: s
                 asset_dir=".",  # Use current directory for assets
                 out_dir=temp_dir
             )
-            preview_generator.tracks = [preview_generator.create_track(track_data) for track_data in schema]
+            preview_generator.tracks = [VideoTrack(track_data, '480p') for track_data in schema]
             preview_generator.generate()
             preview_generator.save("preview.mp4")
             preview_generator.cleanup()
@@ -42,7 +42,7 @@ def generate_video(schema: Dict, preview_resolution: str, download_resolution: s
                 asset_dir=".",  # Use current directory for assets
                 out_dir=temp_dir
             )
-            download_generator.tracks = [download_generator.create_track(track_data) for track_data in schema]
+            download_generator.tracks = [VideoTrack(track_data, '1080p') for track_data in schema]
             download_generator.generate()
             download_generator.save("download.mp4")
             download_generator.cleanup()
