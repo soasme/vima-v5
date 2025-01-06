@@ -25,7 +25,7 @@ def main():
     title = st.text_area("Enter quiz title:")
     
     # Color input
-    title_color = st.color_picker("Pick title color", "#ffffff")
+    title_color = st.color_picker("Pick title color", "#000000")
     
     # Music selection
     music_options = list(BACKGROUND_MUSIC.keys())
