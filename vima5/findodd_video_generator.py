@@ -30,7 +30,7 @@ def create_quiz_video(image_path, title, center_point, top_point, title_color, m
     
     # Add title text
     txt_clip = TextClip(
-        font='Arial',
+        font='./assets/from-cartoon-blocks.ttf',
         text=title, 
         font_size=70, 
         bg_color='#f0f0f0',
@@ -55,13 +55,13 @@ def create_quiz_video(image_path, title, center_point, top_point, title_color, m
     
     # Load and set audio
     background_music = AudioFileClip(music_url).with_duration(13)
-    #bingo_sound = AudioFileClip("assets/bingo.wav").set_start(10)
+    bingo_sound = AudioFileClip("assets/win.mp3").with_start(10).with_duration(1)
     
     # Combine all elements
     final_clip = CompositeVideoClip([image_clip, txt_clip, highlight])
     final_clip = final_clip.with_audio(CompositeAudioClip([
         background_music,
-        #bingo_sound
+        bingo_sound
     ]))
     
     # Write video file
