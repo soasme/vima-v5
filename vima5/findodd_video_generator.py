@@ -9,7 +9,7 @@ Path("assets").mkdir(exist_ok=True)
 def load_image(image_source):
     return Image.open(image_source)
 
-def create_quiz_video(image_path, title, title_bg_color, center_point, top_point, title_color, music_url):
+def create_quiz_video(image_path, title, title_bg_color, answer_box, title_color, music_url):
     # Load the image and create video clip
     image_clip = ImageClip(image_path).with_duration(15)
     
@@ -40,7 +40,7 @@ def create_quiz_video(image_path, title, title_bg_color, center_point, top_point
     
     # Load highlight gif
     highlight = VideoFileClip("assets/highlight.gif", has_mask=True)
-    highlight_scale_factor = abs(center_point['y'] - top_point['y']) / highlight.size[1] * 2.0
+    highlight_scale_factor = (answer_box['bottom'] - answer_box['top']) / highlight.size[1]
     highlight_scale_factor = 1.0 if highlight_scale_factor == 0.0 else highlight_scale_factor
     # Calculate scale based on points
     highlight = highlight.with_effects([vfx.Resize(highlight_scale_factor)])
@@ -49,20 +49,20 @@ def create_quiz_video(image_path, title, title_bg_color, center_point, top_point
     highlight = concatenate_videoclips([highlight] * highlight_loop_count).with_duration(highlight_duration)
     
     # Position highlight gif for last 5 seconds
-    highlight = highlight.with_position((center_point['x'] - highlight.size[0]/2, 
-                                      center_point['y'] - highlight.size[1]/2))
+    highlight = highlight.with_position((answer_box['left'], answer_box['top']))
     highlight = highlight.with_start(10).with_duration(5)
-    
-    # Load and set audio
-    background_music = AudioFileClip(music_url).with_duration(15)
-    bingo_sound = AudioFileClip("assets/win.mp3").with_start(10).with_duration(1)
-    
+
     # Combine all elements
     final_clip = CompositeVideoClip([image_clip, txt_clip, highlight])
-    final_clip = final_clip.with_audio(CompositeAudioClip([
-        background_music,
-        bingo_sound
-    ]))
+    
+    # Load and set audio
+
+    if music_url:
+        bingo_sound = AudioFileClip("assets/win.mp3").with_start(10).with_duration(1)
+        audio_clip = bingo_sound
+        background_music = AudioFileClip(music_url).with_duration(15)
+        audio_clip = CompositeAudioClip([background_music, bingo_sound])
+        final_clip = final_clip.with_audio(audio_clip)
     
     # Write video file
     out_dir = "/tmp"

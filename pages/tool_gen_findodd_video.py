@@ -13,12 +13,22 @@ from vima5.findodd_video_generator import create_quiz_video, load_image
 # Background music options
 # https://pixabay.com/music/search/kids/
 BACKGROUND_MUSIC = {
+    "No Sound": None,
     "Better Kids Day": "https://cdn.pixabay.com/audio/2024/12/19/audio_4e9237d491.mp3",
 }
 
+def get_crop_coords(scale=1.0):
+    img = Image.open('./assets/highlight.gif')
+    top = st.session_state.tool_gen_findodd_video_top_point['y'] / scale
+    bottom = (st.session_state.tool_gen_findodd_video_center_point['y'] + abs(st.session_state.tool_gen_findodd_video_top_point['y'] - st.session_state.tool_gen_findodd_video_center_point['y'])) / scale
+    img_scale = (bottom - top) / img.size[1]
+    left = st.session_state.tool_gen_findodd_video_center_point['x'] / scale - img.size[0] * img_scale * 0.5
+    right = left + img.size[0] * img_scale
+    return dict(left=left, top=top, right=right, bottom=bottom)
 
 def main():
-    st.title("Quiz Video Generator")
+
+    st.title("Quiz Shorts Generator")
 
     # Image input
     image_source = st.file_uploader("Upload image:")
@@ -26,6 +36,7 @@ def main():
     
     # Color input
     title_color = st.color_picker("Pick title color", "#000000")
+    title_bg_color = st.color_picker("Pick title background color", "#FFFFFF")
     
     # Music selection
     music_options = list(BACKGROUND_MUSIC.keys())
@@ -58,39 +69,36 @@ def main():
                 st.session_state.tool_gen_findodd_video_top_point = {}
 
             select_point = st.radio("Select point", ["Center", "Top", "Preview"])
+            img_scale = 500.0 / img.size[0]
             if select_point == "Center":
-                coords = streamlit_image_coordinates(img)
+                coords = streamlit_image_coordinates(img, width=500)
                 if coords:
                     st.session_state.tool_gen_findodd_video_center_point = coords
             elif select_point == "Top":
-                coords = streamlit_image_coordinates(img)
+                coords = streamlit_image_coordinates(img, width=500)
                 if coords:
                     st.session_state.tool_gen_findodd_video_top_point = coords
             elif select_point == "Preview":
-                top = st.session_state.tool_gen_findodd_video_top_point['y']
-                bottom = (st.session_state.tool_gen_findodd_video_center_point['y'] + abs(st.session_state.tool_gen_findodd_video_top_point['y'] - st.session_state.tool_gen_findodd_video_center_point['y']))
-                left = st.session_state.tool_gen_findodd_video_center_point['x'] - abs(bottom-top)/img.size[1]*img.size[0]*0.5
-                right = st.session_state.tool_gen_findodd_video_center_point['x'] + abs(bottom-top)/img.size[1]*img.size[0]*0.5
+                crop = get_crop_coords(scale=img_scale)
                 st.image(img.crop((
-                    left,
-                    top,
-                    right,
-                    bottom,
+                    crop['left'],
+                    crop['top'],
+                    crop['right'],
+                    crop['bottom'],
                 )))
-
 
             st.write(f"Center Point: {st.session_state.tool_gen_findodd_video_center_point}")
             st.write(f"Top Point: {st.session_state.tool_gen_findodd_video_top_point}")
 
-
-
             # Generate video button
             if st.button("Generate Video"):
+                st.write(get_crop_coords(scale=img_scale))
+                st.write(img_scale)
                 video_path = create_quiz_video(
                     image_source,
                     title,
-                    st.session_state.tool_gen_findodd_video_center_point,
-                    st.session_state.tool_gen_findodd_video_top_point,
+                    title_bg_color,
+                    get_crop_coords(scale=img_scale),
                     title_color,
                     music_url
                 )
