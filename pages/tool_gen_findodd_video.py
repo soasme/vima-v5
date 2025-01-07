@@ -14,6 +14,12 @@ from vima5.findodd_video_generator import create_quiz_video, load_image, create_
 # https://pixabay.com/music/search/kids/
 BACKGROUND_MUSIC = {
     "Better Kids Day": "https://cdn.pixabay.com/audio/2024/12/19/audio_4e9237d491.mp3",
+    # 96kps, needs improvement.
+    "Bike Rides": "https://directory.audio/media/fc_local_media/audio_preview/the green orbs - bike rides -bright-.mp3",
+    "Bunny Hop": "https://directory.audio/media/fc_local_media/audio_preview/quincas moreira - bunny hop -happy-.mp3",
+    "Get Outside": "https://directory.audio/media/fc_local_media/audio_preview/jason farnham - get outside -happy-.mp3",
+    "The Farmer In The Dell": "https://directory.audio/media/fc_local_media/audio_preview/the green orbs - the farmer in the dell instrumental -happy-.mp3",
+    "Sugar Zone": "https://directory.audio/media/fc_local_media/audio_preview/silent partner - sugar zone -happy-.mp3",
 }
 
 def get_page_crop_coords(idx, scale=1.0):
