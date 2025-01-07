@@ -29,7 +29,6 @@ def main():
 
     st.title("Quiz Shorts Generator")
 
-
     # Image input
     image_source = st.file_uploader("Upload image:")
     title = st.text_area("Enter quiz title:")
@@ -95,7 +94,7 @@ def main():
             if st.button("Generate Video"):
                 st.write('Generating video...')
                 with st.spinner("Generating video..."):
-                    video_path = create_quiz_video(
+                    video_bytes = create_quiz_video(
                         image_source,
                         title,
                         title_bg_color,
@@ -107,16 +106,14 @@ def main():
                         resolution=resolution,
                     )
 
-                    st.video(video_path)
+                    st.video(video_bytes)
                     
                     # Provide download link
-                    with open(video_path, 'rb') as f:
-                        st.download_button(
-                            label="Download Video",
-                            data=f,
-                            file_name="/tmp/quiz_video.mp4",
-                            mime="video/mp4"
-                        )
+                    st.download_button(
+                        label="Download Video",
+                        data=video_bytes,
+                        mime="video/mp4",
+                    )
                 
         finally:
             pass

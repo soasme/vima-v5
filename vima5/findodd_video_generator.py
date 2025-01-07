@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+from tempfile import NamedTemporaryFile
 from moviepy import *
 from pathlib import Path
 
@@ -91,9 +92,76 @@ def create_quiz_video(image_path, title, title_bg_color, answer_box, title_color
         final_clip = final_clip.with_audio(audio_clip)
     
     # Write video file
-    out_dir = "/tmp"
-    output_filename = "quiz_video.mp4"
-    output_path = os.path.join(out_dir, output_filename)
-    final_clip.write_videofile(output_path, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac")
+    with NamedTemporaryFile(suffix='.mp4') as fp:
+        final_clip.write_videofile(fp.name, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac")
+        fp.seek(0)
+        return fp.read()
+
+def create_quiz_video_set(
+    pages, # array, each element is a dict with keys: image_path, title, title_bg_color, answer_box, title_color
+    music_url, ratio='9:16', resolution='1080p',
+):
+    # Resize to aspect ratio while maintaining image within bounds
+    target_ratio = RATIO_MAP.get(ratio, 9/16)
+    target_resolution = RESOLUTION_MAP.get(resolution, RESOLUTION_MAP['1080p']).get(ratio, RESOLUTION_MAP['1080p']['9:16'])
+
+    clips = []
+    for page in pages:
+        title = page['title']
+        title_bg_color = page['title_bg_color']
+        title_color = page['title_color']
+        image_path = page['image']
+
+        # Load the image and create video clip
+        image_clip = ImageClip(image_path).with_duration(15)
+
+        # Resize to aspect ratio while maintaining image within bounds
+        img_w, img_h = image_clip.size
+        current_ratio = img_w/img_h
+        image_scale = max(target_resolution[0]/img_w, target_resolution[1] / img_h)
+        image_clip = image_clip.with_effects([vfx.Resize(image_scale)])
+    
+        # Add title text
+        txt_clip = TextClip(
+            font='./assets/from-cartoon-blocks.ttf',
+            text=title, 
+            font_size=font_size, 
+            bg_color=title_bg_color,
+            color=title_color,
+            margin=(10, 10),
+        ).with_position(('center', 50)).with_duration(15)
+    
+        # Load highlight gif
+        highlight = VideoFileClip("assets/highlight.gif", has_mask=True)
+        highlight_scale_factor = (answer_box['bottom'] - answer_box['top']) / highlight.size[1] * image_scale
+        highlight_scale_factor = 1.0 if highlight_scale_factor == 0.0 else highlight_scale_factor
+        # Calculate scale based on points
+        highlight = highlight.with_effects([vfx.Resize(highlight_scale_factor)])
+        highlight_duration = 5
+        highlight_loop_count = int(highlight_duration // highlight.duration + 1)
+        highlight = concatenate_videoclips([highlight] * highlight_loop_count).with_duration(highlight_duration)
+        
+        # Position highlight gif for last 5 seconds
+        highlight = highlight.with_position((answer_box['left']*image_scale, answer_box['top']*image_scale))
+        highlight = highlight.with_start(10).with_duration(5)
+
+        clips.append([image_clip, txt_clip, highlight])
+
+    # Combine all elements
+    final_clip = CompositeVideoClip(clips)
+    
+    # Load and set audio
+    if music_url:
+        background_music = AudioFileClip(music_url).with_duration(15 * len(pages))
+        final_clip = final_clip.with_audio(background_music)
+    
+    # Write video file
+    fp = NamedTemporaryFile(delete_on_close=False, suffix=".mp4")
+    final_clip.write_videofile(
+            fp.name,
+            fps=24,
+            codec="libx264",
+            temp_audiofile="temp-audio.m4a",
+            remove_temp=True, audio_codec="aac")
     
     return "/tmp/quiz_video.mp4"
