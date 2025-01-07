@@ -13,7 +13,6 @@ from vima5.findodd_video_generator import create_quiz_video, load_image
 # Background music options
 # https://pixabay.com/music/search/kids/
 BACKGROUND_MUSIC = {
-    "No Sound": None,
     "Better Kids Day": "https://cdn.pixabay.com/audio/2024/12/19/audio_4e9237d491.mp3",
 }
 
@@ -30,6 +29,7 @@ def main():
 
     st.title("Quiz Shorts Generator")
 
+
     # Image input
     image_source = st.file_uploader("Upload image:")
     title = st.text_area("Enter quiz title:")
@@ -37,18 +37,19 @@ def main():
     # Color input
     title_color = st.color_picker("Pick title color", "#000000")
     title_bg_color = st.color_picker("Pick title background color", "#FFFFFF")
+    title_font_size = st.number_input("Title font size", min_value=10, max_value=200, value=100)
     
     # Music selection
     music_options = list(BACKGROUND_MUSIC.keys())
     selected_music = st.selectbox(
         "Choose background music:",
-        ["Random"] + music_options
+        ["Random", "No Sound"] + music_options
     )
     
     if selected_music == "Random":
         selected_music = random.choice(music_options)
-    
-    music_url = BACKGROUND_MUSIC[selected_music]
+
+    music_url = BACKGROUND_MUSIC[selected_music] if selected_music != 'No Sound' else None
         
     # Only show preview and continue if image is provided
     center_point = {}
@@ -87,20 +88,27 @@ def main():
                     crop['bottom'],
                 )))
 
-            st.write(f"Center Point: {st.session_state.tool_gen_findodd_video_center_point}")
-            st.write(f"Top Point: {st.session_state.tool_gen_findodd_video_top_point}")
+            #st.write(f"Center Point: {st.session_state.tool_gen_findodd_video_center_point}")
+            #st.write(f"Top Point: {st.session_state.tool_gen_findodd_video_top_point}")
 
             # Generate video button
+            ratio = st.radio("Select aspect ratio", ["16:9", "9:16"])
+            resolution = st.radio("Select resolution", ["1080p", "720p", "480p"])
+
             if st.button("Generate Video"):
-                st.write(get_crop_coords(scale=img_scale))
-                st.write(img_scale)
+                #st.write(get_crop_coords(scale=img_scale))
+                #st.write(img_scale)
+                st.write('Generating video...')
                 video_path = create_quiz_video(
                     image_source,
                     title,
                     title_bg_color,
                     get_crop_coords(scale=img_scale),
                     title_color,
-                    music_url
+                    music_url,
+                    font_size=title_font_size,
+                    ratio=ratio,
+                    resolution=resolution,
                 )
 
                 st.video(video_path)
@@ -117,7 +125,7 @@ def main():
                 st.warning("Please select both points to generate video.")
                 
         finally:
-            st.write("Complete")
+            pass
 
 if __name__ == "__main__":
     main()
