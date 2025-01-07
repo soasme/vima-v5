@@ -8,13 +8,27 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 import random
 from pathlib import Path
 
-from vima5.findodd_video_generator import create_quiz_video, load_image
+from vima5.findodd_video_generator import create_quiz_video, load_image, create_quiz_video_set
 
 # Background music options
 # https://pixabay.com/music/search/kids/
 BACKGROUND_MUSIC = {
     "Better Kids Day": "https://cdn.pixabay.com/audio/2024/12/19/audio_4e9237d491.mp3",
 }
+
+def get_page_crop_coords(idx, scale=1.0):
+    img = Image.open('./assets/highlight.gif')
+    center_x = st.session_state.tool_findodd_pages[idx]['center_point']['x']
+    center_y = st.session_state.tool_findodd_pages[idx]['center_point']['y']
+    top_x = st.session_state.tool_findodd_pages[idx]['top_point']['x']
+    top_y = st.session_state.tool_findodd_pages[idx]['top_point']['y']
+
+    top = top_y / scale
+    bottom = (center_y + abs(top_y - center_y)) / scale
+    img_scale = (bottom - top) / img.size[1]
+    left = center_x / scale - img.size[0] * img_scale * 0.5
+    right = left + img.size[0] * img_scale
+    return dict(left=left, top=top, right=right, bottom=bottom)
 
 def get_crop_coords(scale=1.0):
     img = Image.open('./assets/highlight.gif')
@@ -29,15 +43,67 @@ def main():
 
     st.title("Quiz Shorts Generator")
 
+    page_num = st.number_input("Number of pages", min_value=1, value=1)
+    st.session_state.tool_findodd_pages = [{
+        'index': index,
+        'title': '',
+        'title_color': '#000000',
+        'title_bg_color': '#FFFFFF',
+        'title_font_size': 120,
+        'image': None,
+        'answer_box': {},
+    } for index in range(page_num)]
+
     # Image input
-    image_source = st.file_uploader("Upload image:")
-    title = st.text_area("Enter quiz title:")
+    for page_idx in range(page_num):
+        st.write(f"### Page {page_idx + 1}")
+
+        image_source = st.file_uploader(f"Upload image {page_idx}")
+        title = st.text_area(f"Enter quiz title {page_idx}:")
+        title_color = st.color_picker(f"Pick title color {page_idx}", "#000000")
+        title_bg_color = st.color_picker(f"Pick title background color {page_idx}", "#FFFFFF")
+        title_font_size = st.number_input(f"Title font size {page_idx}", min_value=10, max_value=200, value=120)
+        st.session_state.tool_findodd_pages[page_idx].update({
+            'image': image_source,
+            'title': title,
+            'title_color': title_color,
+            'title_bg_color': title_bg_color,
+            'title_font_size': title_font_size,
+        })
+        # Only show preview and continue if image is provided
+        if image_source:
+            img = load_image(image_source)
+            
+            st.write("Click to set points:")
+            st.write("1. Center of highlight")
+            st.write("2. Top of highlight")
+            
+            # Get click coordinates
+            img_scale = 500.0 / img.size[0]
+            coords = streamlit_image_coordinates(img, width=500, key=f"answer_box_{page_idx}", click_and_drag=True)
+            if coords:
+                answer_box = {
+                    'left': coords['x1']/img_scale,
+                    'top': coords['y1']/img_scale,
+                    'right': coords['x2']/img_scale,
+                    'bottom': coords['y2']/img_scale,
+                }
+                st.session_state.tool_findodd_pages[page_idx]['answer_box'] = answer_box 
+                st.image(img.crop((
+                    answer_box['left'],
+                    answer_box['top'],
+                    answer_box['right'],
+                    answer_box['bottom'],
+                )))
+
+    st.write(st.session_state.tool_findodd_pages)
+
     
-    # Color input
-    title_color = st.color_picker("Pick title color", "#000000")
-    title_bg_color = st.color_picker("Pick title background color", "#FFFFFF")
-    title_font_size = st.number_input("Title font size", min_value=10, max_value=200, value=100)
-    
+
+    # Generate video button
+    ratio = st.radio("Select aspect ratio", ["16:9", "9:16"])
+    resolution = st.radio("Select resolution", ["1080p", "720p", "480p"])
+
     # Music selection
     music_options = list(BACKGROUND_MUSIC.keys())
     selected_music = st.selectbox(
@@ -49,74 +115,25 @@ def main():
         selected_music = random.choice(music_options)
 
     music_url = BACKGROUND_MUSIC[selected_music] if selected_music != 'No Sound' else None
-        
-    # Only show preview and continue if image is provided
-    center_point = {}
-    top_point = {}
 
-    if image_source:
-        try:
-            img = load_image(image_source)
+    if st.button("Generate Video"):
+        with st.spinner("Generating video..."):
+            video_bytes = create_quiz_video_set(
+                st.session_state.tool_findodd_pages,
+                music_url,
+                ratio=ratio,
+                resolution=resolution,
+            )
+
+            st.video(video_bytes)
             
-            st.write("Click to set points:")
-            st.write("1. Center of highlight")
-            st.write("2. Top of highlight")
-            
-            # Get click coordinates
-            if 'tool_gen_findodd_video_center_point' not in st.session_state:
-                st.session_state.tool_gen_findodd_video_center_point = {}
-            if 'tool_gen_findodd_video_top_point' not in st.session_state:
-                st.session_state.tool_gen_findodd_video_top_point = {}
-
-            select_point = st.radio("Select point", ["Center", "Top", "Preview"])
-            img_scale = 500.0 / img.size[0]
-            if select_point == "Center":
-                coords = streamlit_image_coordinates(img, width=500)
-                if coords:
-                    st.session_state.tool_gen_findodd_video_center_point = coords
-            elif select_point == "Top":
-                coords = streamlit_image_coordinates(img, width=500)
-                if coords:
-                    st.session_state.tool_gen_findodd_video_top_point = coords
-            elif select_point == "Preview":
-                crop = get_crop_coords(scale=img_scale)
-                st.image(img.crop((
-                    crop['left'],
-                    crop['top'],
-                    crop['right'],
-                    crop['bottom'],
-                )))
-
-            # Generate video button
-            ratio = st.radio("Select aspect ratio", ["16:9", "9:16"])
-            resolution = st.radio("Select resolution", ["1080p", "720p", "480p"])
-
-            if st.button("Generate Video"):
-                st.write('Generating video...')
-                with st.spinner("Generating video..."):
-                    video_bytes = create_quiz_video(
-                        image_source,
-                        title,
-                        title_bg_color,
-                        get_crop_coords(scale=img_scale),
-                        title_color,
-                        music_url,
-                        font_size=title_font_size,
-                        ratio=ratio,
-                        resolution=resolution,
-                    )
-
-                    st.video(video_bytes)
-                    
-                    # Provide download link
-                    st.download_button(
-                        label="Download Video",
-                        data=video_bytes,
-                        mime="video/mp4",
-                    )
+            # Provide download link
+            st.download_button(
+                label="Download Video",
+                data=video_bytes,
+                mime="video/mp4",
+            )
                 
-        finally:
-            pass
 
 if __name__ == "__main__":
     main()

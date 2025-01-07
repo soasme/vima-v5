@@ -1,9 +1,11 @@
 streamlit
 streamlit-extras
 streamlit-local-storage
+streamlit_image_coordinates 
 openai
 moviepy
 whisper
 whisper-timestamped
 pyquery
 requests
+Pillow

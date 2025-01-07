@@ -107,13 +107,17 @@ def create_quiz_video_set(
 
     clips = []
     for page in pages:
+        print(page)
         title = page['title']
         title_bg_color = page['title_bg_color']
         title_color = page['title_color']
+        font_size = page['title_font_size']
         image_path = page['image']
+        index = page['index']
+        answer_box = page['answer_box']
 
         # Load the image and create video clip
-        image_clip = ImageClip(image_path).with_duration(15)
+        image_clip = ImageClip(image_path).with_duration(15).with_start(index * 15)
 
         # Resize to aspect ratio while maintaining image within bounds
         img_w, img_h = image_clip.size
@@ -129,7 +133,7 @@ def create_quiz_video_set(
             bg_color=title_bg_color,
             color=title_color,
             margin=(10, 10),
-        ).with_position(('center', 50)).with_duration(15)
+        ).with_position(('center', 50)).with_duration(15).with_start(index * 15)
     
         # Load highlight gif
         highlight = VideoFileClip("assets/highlight.gif", has_mask=True)
@@ -143,9 +147,9 @@ def create_quiz_video_set(
         
         # Position highlight gif for last 5 seconds
         highlight = highlight.with_position((answer_box['left']*image_scale, answer_box['top']*image_scale))
-        highlight = highlight.with_start(10).with_duration(5)
+        highlight = highlight.with_start(index * 15 + 10).with_duration(5)
 
-        clips.append([image_clip, txt_clip, highlight])
+        clips.extend([image_clip, txt_clip, highlight])
 
     # Combine all elements
     final_clip = CompositeVideoClip(clips)
@@ -156,12 +160,7 @@ def create_quiz_video_set(
         final_clip = final_clip.with_audio(background_music)
     
     # Write video file
-    fp = NamedTemporaryFile(delete_on_close=False, suffix=".mp4")
-    final_clip.write_videofile(
-            fp.name,
-            fps=24,
-            codec="libx264",
-            temp_audiofile="temp-audio.m4a",
-            remove_temp=True, audio_codec="aac")
-    
-    return "/tmp/quiz_video.mp4"
+    with NamedTemporaryFile(suffix='.mp4') as fp:
+        final_clip.write_videofile(fp.name, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac")
+        fp.seek(0)
+        return fp.read()
