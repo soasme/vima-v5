@@ -88,41 +88,35 @@ def main():
                     crop['bottom'],
                 )))
 
-            #st.write(f"Center Point: {st.session_state.tool_gen_findodd_video_center_point}")
-            #st.write(f"Top Point: {st.session_state.tool_gen_findodd_video_top_point}")
-
             # Generate video button
             ratio = st.radio("Select aspect ratio", ["16:9", "9:16"])
             resolution = st.radio("Select resolution", ["1080p", "720p", "480p"])
 
             if st.button("Generate Video"):
-                #st.write(get_crop_coords(scale=img_scale))
-                #st.write(img_scale)
                 st.write('Generating video...')
-                video_path = create_quiz_video(
-                    image_source,
-                    title,
-                    title_bg_color,
-                    get_crop_coords(scale=img_scale),
-                    title_color,
-                    music_url,
-                    font_size=title_font_size,
-                    ratio=ratio,
-                    resolution=resolution,
-                )
-
-                st.video(video_path)
-                
-                # Provide download link
-                with open(video_path, 'rb') as f:
-                    st.download_button(
-                        label="Download Video",
-                        data=f,
-                        file_name="/tmp/quiz_video.mp4",
-                        mime="video/mp4"
+                with st.spinner("Generating video..."):
+                    video_path = create_quiz_video(
+                        image_source,
+                        title,
+                        title_bg_color,
+                        get_crop_coords(scale=img_scale),
+                        title_color,
+                        music_url,
+                        font_size=title_font_size,
+                        ratio=ratio,
+                        resolution=resolution,
                     )
-            else:
-                st.warning("Please select both points to generate video.")
+
+                    st.video(video_path)
+                    
+                    # Provide download link
+                    with open(video_path, 'rb') as f:
+                        st.download_button(
+                            label="Download Video",
+                            data=f,
+                            file_name="/tmp/quiz_video.mp4",
+                            mime="video/mp4"
+                        )
                 
         finally:
             pass
