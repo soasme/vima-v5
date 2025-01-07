@@ -107,7 +107,6 @@ def create_quiz_video_set(
 
     clips = []
     for page in pages:
-        print(page)
         title = page['title']
         title_bg_color = page['title_bg_color']
         title_color = page['title_color']
@@ -149,7 +148,12 @@ def create_quiz_video_set(
         highlight = highlight.with_position((answer_box['left']*image_scale, answer_box['top']*image_scale))
         highlight = highlight.with_start(index * 15 + 10).with_duration(5)
 
-        clips.extend([image_clip, txt_clip, highlight])
+        new_clips = [image_clip, txt_clip, highlight]
+        if index > 0:
+            # apply crossfadein vfx
+            new_clips.insert(0, image_clip.with_effects([vfx.CrossFadeIn(1)]).with_start(index * 15 - 1).with_duration(1))
+
+        clips.extend(new_clips)
 
     # Combine all elements
     final_clip = CompositeVideoClip(clips)
