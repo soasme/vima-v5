@@ -49,8 +49,8 @@ LIMB_CONNECTIONS = [
 
 # Built-in motions
 BUILT_IN_MOTIONS = {
-    "the-enchilada-dance": Motion(
-        name="the-enchilada-dance",
+    "simple-dance": Motion(
+        name="simple-dance",
         fps=30,
         keyframes=[
             Keyframe(
@@ -58,15 +58,51 @@ BUILT_IN_MOTIONS = {
                     PointRotation("left_shoulder", 45),
                     PointRotation("left_elbow", 90),
                     PointRotation("left_wrist", 90),
-                    PointRotation("right_shoulder", -45),
+                    PointRotation("right_shoulder", 135),
+                    PointRotation("right_elbow", -90),
+                    PointRotation("right_wrist", -45),
+                    PointRotation("left_hip", 90),
+                    PointRotation("left_knee", 45),
+                    PointRotation("left_ankle", 0),
+                    PointRotation("right_hip", 45),
+                    PointRotation("right_knee", 135),
+                    PointRotation("right_ankle", 0),
+                ],
+                transition=TransitionType.EASE_IN_OUT,
+                duration=0.5
+            ),
+            Keyframe(
+                rotations=[
+                    PointRotation("left_shoulder", 45),
+                    PointRotation("left_elbow", 0),
+                    PointRotation("left_wrist", 90),
+                    PointRotation("right_shoulder", 90),
                     PointRotation("right_elbow", -90),
                     PointRotation("right_wrist", -45),
                     PointRotation("left_hip", 30),
                     PointRotation("left_knee", 45),
-                    PointRotation("left_ankle", 15),
-                    PointRotation("right_hip", -30),
-                    PointRotation("right_knee", -45),
-                    PointRotation("right_ankle", -15),
+                    PointRotation("left_ankle", 30),
+                    PointRotation("right_hip", 120),
+                    PointRotation("right_knee", 120),
+                    PointRotation("right_ankle", 30),
+                ],
+                transition=TransitionType.EASE_IN_OUT,
+                duration=0.5
+            ),
+            Keyframe(
+                rotations=[
+                    PointRotation("left_shoulder", 45),
+                    PointRotation("left_elbow", 90),
+                    PointRotation("left_wrist", 90),
+                    PointRotation("right_shoulder", 135),
+                    PointRotation("right_elbow", -90),
+                    PointRotation("right_wrist", -45),
+                    PointRotation("left_hip", 90),
+                    PointRotation("left_knee", 45),
+                    PointRotation("left_ankle", 0),
+                    PointRotation("right_hip", 45),
+                    PointRotation("right_knee", 135),
+                    PointRotation("right_ankle", 0),
                 ],
                 transition=TransitionType.EASE_IN_OUT,
                 duration=0.5
@@ -146,9 +182,13 @@ class MotionLoader:
         )
 
 class AnimationGenerator:
-    def __init__(self, torso_path: str, points: Dict[str, Tuple[int, int]]):
+    def __init__(self, torso_path: str, points: Dict[str, Tuple[int, int]],
+                 limb_color: str = "#000000"):
         self.torso = Image.open(torso_path)
         self.points = points
+        self.limb_width = 3
+        self.limb_color = limb_color
+        self.foot_length = 20
         # Initialize all joint positions
         self._initialize_joints()
     
@@ -220,6 +260,21 @@ class AnimationGenerator:
             t = 2 * progress * progress if progress < 0.5 else 1 - pow(-2 * progress + 2, 2) / 2
             
         return start + (end - start) * t
+
+    def _calculate_foot_points(self, ankle_point: Tuple[int, int],
+                               foot_angle: float = 0,
+                               foot_length: int = 20) -> List[Tuple[int, int]]:
+        """Calculate points for a foot from ankle position.
+        The foot direction is applied with the ankle angle."""
+        foot_tip_point = (
+            int(ankle_point[0] + foot_length * math.cos(math.radians(foot_angle))),
+            int(ankle_point[1] + foot_length * math.sin(math.radians(foot_angle)))
+        )
+        foot_points = [
+            ankle_point,
+            foot_tip_point,
+        ]
+        return foot_points
     
     def _calculate_finger_points(self, wrist_point: Tuple[int, int], 
                                wrist_angle: float, 
@@ -282,13 +337,20 @@ class AnimationGenerator:
         
         # Draw the main limb curve
         self._draw_bezier_curve(draw, [start_point, ctrl1, ctrl2, end_point], 
-                               width=thickness)
+                                color=self.limb_color,
+                                width=thickness)
         
         return end_point
 
     def generate_frame(self, angles: Dict[str, float]) -> Image.Image:
         """Generate a single frame with given angles for all joints including fingers."""
-        frame = Image.new('RGBA', self.torso.size, (255, 255, 255, 0))
+        # frame size is a bit larger than torso image to fit limbs
+        frame_size = (self.torso.width + 100, self.torso.height + 100)
+        frame = Image.new('RGBA', frame_size, (255, 255, 255, 0))
+
+        # Paste torso
+        frame.paste(self.torso, (0, 0), self.torso)
+
         draw = ImageDraw.Draw(frame)
         
         # Update all joint positions based on angles
@@ -324,16 +386,22 @@ class AnimationGenerator:
                         angles[start_joint]  # Use the same angle as the forearm
                     )
                     for finger_points in fingers:
-                        self._draw_bezier_curve(draw, finger_points, width=2)
+                        self._draw_bezier_curve(draw, finger_points, width=self.limb_width, color=self.limb_color)
+
+                # Draw feet at ankle positions
+                if end_joint.endswith('ankle'):
+                    foot = self._calculate_foot_points(end_point, angles[end_joint], foot_length=self.foot_length)
+                    draw.line(foot, fill=self.limb_color, width=self.limb_width)
         
-        # Paste torso
-        frame.paste(self.torso, (0, 0), self.torso)
         return frame 
 
     def generate_animation(self, motion: Motion, output_path: str):
         """Generate full animation from motion data."""
         frames = []
-        current_angles = {point: 0 for point in self.points.keys()}
+        current_angles = {
+            r.point_id: r.angle
+            for r in motion.keyframes[0].rotations
+        }
         
         for i in range(len(motion.keyframes)):
             current_frame = motion.keyframes[i]
@@ -368,6 +436,7 @@ def main():
     parser.add_argument('--right-hip', required=True, help='Right hip position (x,y)')
     parser.add_argument('--motion', required=True, help='Motion source (built-in name, file path, or URL)')
     parser.add_argument('--path', required=True, help='Output GIF path')
+    parser.add_argument('--limb-color', required=True, help='Hex color of limbs')
     
     args = parser.parse_args()
     
@@ -381,7 +450,7 @@ def main():
     
     # Load motion and generate animation
     motion = MotionLoader.load_motion(args.motion)
-    generator = AnimationGenerator(args.torso, points)
+    generator = AnimationGenerator(args.torso, points, limb_color=args.limb_color)
     generator.generate_animation(motion, args.path)
 
 if __name__ == '__main__':
