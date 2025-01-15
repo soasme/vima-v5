@@ -9,3 +9,4 @@ whisper-timestamped
 pyquery
 requests
 Pillow
+librosa
