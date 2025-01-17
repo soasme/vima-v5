@@ -1,4 +1,5 @@
 import csv
+import os
 import math
 import json
 import sys
@@ -8,6 +9,8 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+
+asset_path = os.environ['ASSET_PATH']
 
 def round_corners(image, radius):
   """
@@ -143,7 +146,6 @@ def make_script():
 
 def make_level():
     data = json.load(sys.stdin)
-    asset_path = '/Users/soasme/Downloads/Foonimal_1/'
     level = data['Level']
     bg_path = asset_path + data['Background']
     image_path = asset_path + data['Image']
@@ -173,7 +175,7 @@ def make_level():
     image = Image.open(image_path)
     rounded_image = round_corners(image, radius=50)
     image_clip = ImageClip(np.array(rounded_image)).with_duration(duration)
-    image_clip = image_clip.with_effects([vfx.Resize((710, 710))])
+    image_clip = image_clip.with_effects([vfx.Resize(lambda t: (710 - 10 * math.sin(t), 710))])
     image_clip_margin_bottom = 100
     image_clip = image_clip.with_position(lambda t: (
         logo_clip.size[0]+logo_margin[0]+subscribe_margin[0],
@@ -247,8 +249,6 @@ def make_level():
 
     with open(f'level_{level}.mp4', 'wb') as f:
         f.write(data)
-
-
 
 if __name__ == '__main__':
     if sys.argv[1] == 'csv':
