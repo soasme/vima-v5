@@ -209,7 +209,7 @@ def make_level(data):
 
     level_number_clip = TextClip(
         font='./assets/04b_30.ttf',
-        text=f'{level}',
+        text=f'{level}/20',
         font_size=140,
         color='#d02d83',
     ).with_duration(1.5).with_start(2.5).with_effects([vfx.CrossFadeIn(0.1)]).with_position(('center', 600))
@@ -217,7 +217,7 @@ def make_level(data):
     # TODO: should use relative position
     level_number_shadow_clip = TextClip(
         font='./assets/04b_30.ttf',
-        text=f'{level}',
+        text=f'{level}/20',
         font_size=144,
         color='#000000',
     ).with_duration(1.5).with_start(2.5).with_effects([vfx.CrossFadeIn(0.1)]).with_position(('center', 600))
@@ -447,7 +447,7 @@ def make_all_levels(data):
     level_cfgs = []
     for i, level in enumerate(data):
         level_cfg = {
-        	"Level": 20-i,
+        	"Level": i+1,
         	"LevelIntro": "LevelIntro.mp4",
         	"LevelIntroSound": "levelandshowup.mp3",
         	"QueVoiceover": f"LevelQue_{i+1}.mp3",
