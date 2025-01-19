@@ -1,3 +1,4 @@
+import argparse
 import logging
 import csv
 import subprocess
@@ -468,10 +469,12 @@ def load_cfg():
     with open(asset_path / 'config.json') as f:
         return json.load(f)
 
-def make_all_levels(data):
+def make_all_levels(data, args):
     cfg = load_cfg()
     level_cfgs = []
     for level in data:
+        if args.level is not None and level['Level'] != args.level:
+            continue
         level_cfg = dict(level)
         for k, v in cfg.items():
             if isinstance(v, str):
@@ -484,12 +487,11 @@ def make_all_levels(data):
     for level_cfg in level_cfgs:
         make_level(level_cfg)
 
-def concat_levels():
-    # add optional intro videos, outtro videos
-    # write to videolist.txt for ffmpeg concat
-    #intros = data['intros']
-    #outtros = data['outros']
-    data = load_cfg()
+    if args.level is not None and args.concat:
+        concat_levels(data)
+
+
+def concat_levels(data):
     intros = [asset_path / v for v in data.get('Intro', [])] #["Intro.mp4"]
     outtros = [asset_path / v for v in data.get('Outtro', [])] #["Outtro.mp4"]
     videos = intros + [build_path / ('Level_%d.mp4' % (i+1)) for i in range(20)] + outtros
@@ -507,10 +509,6 @@ def concat_levels():
     clips = [VideoFileClip(video) for video in videos]
     final_clip = concatenate_videoclips(clips)
     final_clip.write_videofile(f'{build_path}/final.mp4', fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=6)
-
-    #subprocess.run(['ffmpeg', '-r', '30', '-fflags',  '+igndts', '-bsf:v', 'h264_mp4toannexb', '-f', 'mpegts', '-f', 'concat', '-safe', '0', '-i', f'{build_path}/videolist.txt', '-vf', 'select=concatdec_select', '-af', 'aselect=concatdec_select,aresample=async=1', f'{build_path}/final.mp4'])
-    #subprocess.run(['ffmpeg', '-r', '30', '-fflags',  '+igndts', '-bsf:v', 'h264_mp4toannexb', '-f', 'mpegts', '-f', 'concat', '-safe', '0', '-i', f'{build_path}/videolist.txt', '-vf', 'select=concatdec_select', '-af', 'aselect=concatdec_select,aresample=async=1000', f'{build_path}/final.mp4'])
-
     
 
 if __name__ == '__main__':
@@ -518,6 +516,8 @@ if __name__ == '__main__':
 
     if not os.path.exists(build_path):
         os.makedirs(build_path)
+
+    parser = argparse.ArgumentParser(description='WFQ Helper')
 
     elif sys.argv[1] == 'convertmp3':
         convertmp3(sys.argv[2])
@@ -530,15 +530,15 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'allvoiceovers':
         make_all_voiceovers(json.load(sys.stdin))
     elif sys.argv[1] == 'alllevels':
-        # TODO: support filter to run specific levels.
-        # TODO: support option to merge levels.
-        make_all_levels(json.load(sys.stdin)) # use quiz.json
+        parser.add_argument('--level', type=int, help='Level to generate')
+        parser.add_argument('--concat', action='store_true', help='Concat levels')
+        args = parser.parse_args()
+        make_all_levels(json.load(sys.stdin), args) # use levels.json
     elif sys.argv[1] == 'concatlevels':
-        concat_levels()
+        concat_levels(json.load(sys.stdin)) # use config.json
 
-
-    # TODO: add selenium client to download images from midjourney.
+    # TODO: download images from midjourney.
     # TODO: add api to call chatgpt to generate questions and answers in json format.
     # TODO: add readme on how to use it.
-    # TODO: performance improvement. see how to run faster.
     # TODO: support loading resources from remote url (like google drive).
+    # TODO: make thumbnail
