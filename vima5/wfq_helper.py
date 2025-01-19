@@ -1,3 +1,4 @@
+import logging
 import csv
 import subprocess
 import os
@@ -17,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from elevenlabs.client import ElevenLabs
 from elevenlabs import save as save_voiceover
 
+logger = logging.getLogger(__name__)
 
 asset_path = Path(os.environ['ASSET_PATH'])
 build_path = asset_path / 'build'
@@ -202,6 +204,8 @@ def make_all_voiceovers(data):
         make_ans_voiceover(elem)
 
 def make_level(data):
+    logger.info(f'Making level {data["Level"]}')
+
     level = data['Level']
     bg_path = asset_path / data['Background']
     image_path = asset_path / data['Image']
@@ -219,6 +223,10 @@ def make_level(data):
     ans_voiceover = data['AnsVoiceover']
     question = data['Question']
     voiceover_bg = data['VoiceoverBackground']
+
+    output = f'{build_path}/level_{level}.mp4'
+    if os.path.exists(output):
+        return
 
     # Move level intro out. Can concat videos in final stage.
     level_intro_clip = VideoFileClip(level_intro_path)
@@ -439,7 +447,7 @@ def make_level(data):
 
     # Write video file
     with NamedTemporaryFile(suffix='.mp4') as fp:
-        final_clip.write_videofile(fp.name, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac")
+        final_clip.write_videofile(fp.name, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
         fp.seek(0)
         data = fp.read()
 
@@ -476,27 +484,16 @@ def make_all_levels(data):
     for level_cfg in level_cfgs:
         make_level(level_cfg)
 
-    #with multiprocessing.Pool(4) as pool:
-    #    pool.map(make_level, level_cfgs)
-
-def concat_levels(data):
+def concat_levels():
     # add optional intro videos, outtro videos
     # write to videolist.txt for ffmpeg concat
     #intros = data['intros']
     #outtros = data['outros']
-    intros = ["Intro.mp4"]
-    outtros = []#"Outtro.mp4"]
-    videos = intros + ['Level_%d.mp4' % (i+1) for i in range(20)] + outtros
-    videos = [asset_path / video for video in videos]
-
-    #clips = []
-    #for video in videos:
-    #    clips.append(VideoFileClip(video))
-
-    #final = concatenate_videoclips(clips)
-    #final.write_videofile(f'{asset_path}/final.mp4')
-
-    #return
+    data = load_cfg()
+    intros = [asset_path / v for v in data.get('Intro', [])] #["Intro.mp4"]
+    outtros = [asset_path / v for v in data.get('Outtro', [])] #["Outtro.mp4"]
+    videos = intros + [build_path / ('Level_%d.mp4' % (i+1)) for i in range(20)] + outtros
+    videos = [build_path / video for video in videos]
 
     if os.path.exists(f'{build_path}/final.mp4'):
         os.remove(f'{build_path}/final.mp4')
@@ -506,11 +503,19 @@ def concat_levels(data):
             f"file '{video}'" for video in videos
         ])
         f.write(content)
-    subprocess.run(['ffmpeg', '-r', '30', '-fflags',  '+igndts', '-bsf:v', 'h264_mp4toannexb', '-f', 'mpegts', '-f', 'concat', '-safe', '0', '-i', f'{build_path}/videolist.txt', '-c', 'copy', f'{build_path}/alllevels.mp4'])
+
+    clips = [VideoFileClip(video) for video in videos]
+    final_clip = concatenate_videoclips(clips)
+    final_clip.write_videofile(f'{build_path}/final.mp4', fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=6)
+
+    #subprocess.run(['ffmpeg', '-r', '30', '-fflags',  '+igndts', '-bsf:v', 'h264_mp4toannexb', '-f', 'mpegts', '-f', 'concat', '-safe', '0', '-i', f'{build_path}/videolist.txt', '-vf', 'select=concatdec_select', '-af', 'aselect=concatdec_select,aresample=async=1', f'{build_path}/final.mp4'])
+    #subprocess.run(['ffmpeg', '-r', '30', '-fflags',  '+igndts', '-bsf:v', 'h264_mp4toannexb', '-f', 'mpegts', '-f', 'concat', '-safe', '0', '-i', f'{build_path}/videolist.txt', '-vf', 'select=concatdec_select', '-af', 'aselect=concatdec_select,aresample=async=1000', f'{build_path}/final.mp4'])
 
     
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+
     if not os.path.exists(build_path):
         os.makedirs(build_path)
 
@@ -518,8 +523,6 @@ if __name__ == '__main__':
         convertmp3(sys.argv[2])
     elif sys.argv[1].startswith('level'):
         make_level(json.load(sys.stdin))
-    elif sys.argv[1] == 'concatlevels':
-        concat_levels(json.load(sys.stdin))
     elif sys.argv[1] == 'quevoiceover':
         make_que_voiceover(json.load(sys.stdin))
     elif sys.argv[1] == 'ansvoiceover':
@@ -530,6 +533,8 @@ if __name__ == '__main__':
         # TODO: support filter to run specific levels.
         # TODO: support option to merge levels.
         make_all_levels(json.load(sys.stdin)) # use quiz.json
+    elif sys.argv[1] == 'concatlevels':
+        concat_levels()
 
 
     # TODO: add selenium client to download images from midjourney.

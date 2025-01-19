@@ -10,3 +10,4 @@ pyquery
 requests
 Pillow
 librosa
+elevenlabs
