@@ -13,7 +13,13 @@ from moviepy import *
 import whisper_timestamped as whisper
 from tempfile import NamedTemporaryFile
 from pathlib import Path
-
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+import time
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from elevenlabs.client import ElevenLabs
@@ -160,22 +166,22 @@ def make_que_voiceover_txt(elem):
     line.append('... ' )
     line.append('Guess who I am?')
     line.append('... ' )
-    line.append(f'A. {elem["Questions"][0]}.')
+    line.append(f'A. {elem["Answers"][0]}.')
     line.append('... ' )
-    line.append(f'B. {elem["Questions"][1]}.')
+    line.append(f'B. {elem["Answers"][1]}.')
     line.append('... ' )
-    line.append(f'C. {elem["Questions"][2]}.')
+    line.append(f'C. {elem["Answers"][2]}.')
     line.append('... ' )
     return ' '.join(line)
 
 def make_ans_voiceover_txt(elem):
-    answer = ANSWER_HANDLES[elem['Questions'].index(elem['Answer']) + 1]
+    answer = ANSWER_HANDLES[elem['Answers'].index(elem['CorrectAnswer']) + 1]
     fusion1 = elem['Explain'][0]
     fusion2 = elem['Explain'][1]
     congrats = random.choice(CONGRATS)
     line = []
     line.append(congrats)
-    line.append(f'The answer is {answer}, {elem["Answer"]}. ')
+    line.append(f'The answer is {answer}, {elem["CorrectAnswer"]}. ')
     line.append(f"It's the fusion of {fusion1} and {fusion2}. ")
     return ' '.join(line)
 
@@ -208,7 +214,12 @@ def make_level(data):
     logger.info(f'Making level {data["Level"]}')
 
     level = data['Level']
-    bg_path = asset_path / data['Background']
+
+    if 'BackgroundImages' in data:
+        bg_path = asset_path / random.choice(data['BackgroundImages'])
+    else:
+        bg_path = asset_path / data['Background']
+
     image_path = asset_path / data['Image']
     logo_path = asset_path / data['Logo']
     level_intro_path = asset_path / data['LevelIntro']
@@ -227,6 +238,7 @@ def make_level(data):
 
     output = f'{build_path}/level_{level}.mp4'
     if os.path.exists(output):
+        logger.info(f'Level {level} already exists: {output}')
         return
 
     # Move level intro out. Can concat videos in final stage.
@@ -509,6 +521,20 @@ def concat_levels(data):
     clips = [VideoFileClip(video) for video in videos]
     final_clip = concatenate_videoclips(clips)
     final_clip.write_videofile(f'{build_path}/final.mp4', fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=6)
+
+def shuffle_levels(path):
+    with open(path) as f:
+        data = json.load(f)
+    for elem in data:
+        random.shuffle(elem['Answers'])
+    with open(path, 'w') as f:
+        f.write(json.dumps(data, indent=2))
+
+
+
+def make_level_images(data):
+    prompts = [e['ImagePrompt'] for e in data if e['Level'] > 1]
+    create_midjourney_images(prompts)
     
 
 if __name__ == '__main__':
@@ -518,24 +544,30 @@ if __name__ == '__main__':
         os.makedirs(build_path)
 
     parser = argparse.ArgumentParser(description='WFQ Helper')
+    parser.add_argument('command', type=str, help='Command to run')
+    parser.add_argument('--path', type=str, help='Path to file')
+    parser.add_argument('--level', type=int, help='Level to generate')
+    parser.add_argument('--concat', action='store_false', help='Concat levels')
+    args = parser.parse_args()
 
-    elif sys.argv[1] == 'convertmp3':
-        convertmp3(sys.argv[2])
-    elif sys.argv[1].startswith('level'):
-        make_level(json.load(sys.stdin))
-    elif sys.argv[1] == 'quevoiceover':
-        make_que_voiceover(json.load(sys.stdin))
-    elif sys.argv[1] == 'ansvoiceover':
-        make_ans_voiceover(json.load(sys.stdin))
-    elif sys.argv[1] == 'allvoiceovers':
-        make_all_voiceovers(json.load(sys.stdin))
-    elif sys.argv[1] == 'alllevels':
-        parser.add_argument('--level', type=int, help='Level to generate')
-        parser.add_argument('--concat', action='store_true', help='Concat levels')
-        args = parser.parse_args()
-        make_all_levels(json.load(sys.stdin), args) # use levels.json
-    elif sys.argv[1] == 'concatlevels':
+    if args.command == 'convertmp3':
+        convertmp3(args.path)
+    elif args.command == "shufflelevels":
+        shuffle_levels(args.path)
+    elif args.command == 'concatlevels':
         concat_levels(json.load(sys.stdin)) # use config.json
+    elif args.command == 'levelimages':
+        make_level_images(json.load(sys.stdin))
+    elif args.command == 'level':
+        make_level(json.load(sys.stdin))
+    elif args.command == 'quevoiceover':
+        make_que_voiceover(json.load(sys.stdin))
+    elif args.command == 'ansvoiceover':
+        make_ans_voiceover(json.load(sys.stdin))
+    elif args.command == 'allvoiceovers':
+        make_all_voiceovers(json.load(sys.stdin))
+    elif args.command == 'alllevels':
+        make_all_levels(json.load(sys.stdin), args) # use levels.json
 
     # TODO: download images from midjourney.
     # TODO: add api to call chatgpt to generate questions and answers in json format.
