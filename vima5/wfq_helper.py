@@ -27,10 +27,9 @@ from elevenlabs import save as save_voiceover
 
 logger = logging.getLogger(__name__)
 
-asset_path = Path(os.environ['ASSET_PATH'])
-build_path = asset_path / 'build'
 elevenlabs_api_key = os.environ.get('ELEVENLABS_API_KEY') or ''
 VOICE = 'TtRFBnwQdH1k01vR0hMz'
+TTS_MODEL = 'eleven_flash_v2_5'
 
 ANSWER_HANDLES = {1: 'A', 2: 'B', 3: 'C'}
 CONGRATS = [
@@ -67,6 +66,24 @@ CONGRATS = [
     "Wow, you're on a winning spree!",
     "Wow, you're on a winning run!",
 ]
+
+def get_asset_path(path):
+    if not os.environ.get('ASSET_PATH'):
+        raise Exception('ASSET_PATH not set')
+    search_paths = os.environ['ASSET_PATH'].split(',')
+    for search_path in search_paths:
+        print(search_path)
+        if Path(search_path).joinpath(path).exists():
+            return Path(search_path).joinpath(path)
+    raise Exception(f'Asset not found: {path}')
+
+def get_build_path(path):
+    if os.environ.get('BUILD_PATH'):
+        return Path(os.environ['BUILD_PATH']) / path
+    if os.environ.get('ASSET_PATH'):
+        search_paths = os.environ['ASSET_PATH'].split(',')
+        last_search_path = search_paths[-1]
+        return Path(last_search_path).joinpath('build') / path
 
 def rounded_rectangle_image(size, color='white', radius=0):
     image = Image.new("RGBA", size, (0, 0, 0, 0))
@@ -189,18 +206,18 @@ def make_voiceover(txt, filename):
     if os.path.exists(filename):
         return
     client = ElevenLabs()
-    audio = client.generate(text=txt, voice=VOICE, model='eleven_multilingual_v2')
+    audio = client.generate(text=txt, voice=VOICE, model=TTS_MODEL)
     save_voiceover(audio, filename)
 
 def make_que_voiceover(elem):
     level = elem['Level']
-    filename = f"{build_path}/LevelQue_{level}.mp3"
+    filename = get_build_path(f"LevelQue_{level}.mp3")
     txt = make_que_voiceover_txt(elem)
     make_voiceover(txt, filename)
 
 def make_ans_voiceover(elem):
     level = elem['Level']
-    filename = f"{build_path}/LevelAns_{level}.mp3"
+    filename = get_build_path(f"LevelAns_{level}.mp3")
     txt = make_ans_voiceover_txt(elem)
     make_voiceover(txt, filename)
 
@@ -216,14 +233,14 @@ def make_level(data):
     level = data['Level']
 
     if 'BackgroundImages' in data:
-        bg_path = asset_path / random.choice(data['BackgroundImages'])
+        bg_path = get_asset_path(random.choice(data['BackgroundImages']))
     else:
-        bg_path = asset_path / data['Background']
+        bg_path = get_asset_path(data['Background'])
 
-    image_path = asset_path / data['Image']
-    logo_path = asset_path / data['Logo']
-    level_intro_path = asset_path / data['LevelIntro']
-    subscribe_path = asset_path / data['Subscribe']
+    image_path = get_asset_path(data['Image'])
+    logo_path = get_asset_path(data['Logo'])
+    level_intro_path = get_asset_path(data['LevelIntro'])
+    subscribe_path = get_asset_path(data['Subscribe'])
     intro_duration = 4 # set later based on intro.mp4
     que_duration = 0 # set later based on voiceover
     timer_duration = data['TimerDuration']
@@ -236,7 +253,7 @@ def make_level(data):
     question = data['Question']
     voiceover_bg = data['VoiceoverBackground']
 
-    output = f'{build_path}/level_{level}.mp4'
+    output = get_build_path(f'level_{level}.mp4')
     if os.path.exists(output):
         logger.info(f'Level {level} already exists: {output}')
         return
@@ -261,15 +278,13 @@ def make_level(data):
 
     intro_duration = level_intro_clip.duration
 
-    que_audio_clip = AudioFileClip(asset_path / que_voiceover)
+    que_audio_clip = AudioFileClip(get_asset_path(que_voiceover))
     que_duration = que_audio_clip.duration
 
-    ans_audio_clip = AudioFileClip(asset_path / ans_voiceover)
+    ans_audio_clip = AudioFileClip(get_asset_path(ans_voiceover))
     ans_duration = ans_audio_clip.duration + 0.5
 
-    # TODO: update this to the length of voiceover of questions and answers.
-    duration = intro_duration + que_duration + timer_duration + reveal_duration # + explain_duration
-    world_duration = que_duration + timer_duration + reveal_duration  + ans_duration
+    world_duration = math.ceil(que_duration + timer_duration + reveal_duration  + ans_duration)
     total_duration = intro_duration + world_duration
 
     # Display background
@@ -369,7 +384,7 @@ def make_level(data):
                 font_size=50,
                 color='#040273',
             )
-            .with_duration(1)
+            .with_duration(reveal_duration)
             .with_start(intro_duration + que_duration + timer_duration)
             .with_position((
                 1920-image_clip_margin_left-image_clip.size[0]-txt_margin[2],
@@ -384,8 +399,8 @@ def make_level(data):
                 font_size=70,
                 color='#040273',
             )
-            .with_duration(reveal_duration-1 + ans_duration)
-            .with_start(intro_duration + que_duration + timer_duration + 1)
+            .with_duration(ans_duration)
+            .with_start(intro_duration + que_duration + timer_duration + reveal_duration)
             .with_position((
                 1920-image_clip_margin_left-image_clip.size[0]-txt_margin[2],
                 1080-image_clip.size[1]-subscribe_margin[1]-subscribe_clip.size[1]-image_clip_margin_bottom+txt_margin[1]
@@ -395,17 +410,16 @@ def make_level(data):
         answers_clip.append(correct_blink_clip)
         answers_clip.append(correct_moveup_clip)
 
-        # TODO: show fusion words
         for index, fusion_word in enumerate(data['Explain']):
             answer_clip = (
                 TextClip(
                     font='./assets/04b_30.ttf',
                     text=fusion_word,
-                    font_size=50,
+                    font_size=70,
                     color='#040273',
                 )
-                .with_duration(reveal_duration-1 + ans_duration)
-                .with_start(intro_duration + que_duration + timer_duration + 1)
+                .with_duration(ans_duration)
+                .with_start(intro_duration + que_duration + timer_duration + reveal_duration)
                 .with_position((
                     1920-image_clip_margin_left-image_clip.size[0]-txt_margin[2],
                     1080-image_clip.size[1]-subscribe_margin[1]-subscribe_clip.size[1]-image_clip_margin_bottom + 100 * (index+1) + txt_margin[1]
@@ -440,12 +454,12 @@ def make_level(data):
     clips.extend([level_intro_clip, level_number_shadow_clip, level_number_clip])
     clips.extend([background_clip, logo_clip, subscribe_clip, image_clip, quiz_txt_bg_clip, question_clip] + answers_clip + timer_clips)
 
-    level_intro_sound_clip = AudioFileClip(asset_path / level_intro_sound)
+    level_intro_sound_clip = AudioFileClip(get_asset_path(level_intro_sound))
     que_audio_clip = que_audio_clip.with_start(intro_duration)
-    que_bg_clip = AudioFileClip(asset_path / voiceover_bg).with_start(intro_duration).with_duration(que_duration)
-    timer_sound_clip = AudioFileClip(asset_path / timer_sound).with_start(level_intro_clip.duration + que_duration)
+    que_bg_clip = AudioFileClip(get_asset_path(voiceover_bg)).with_start(intro_duration).with_duration(que_duration)
+    timer_sound_clip = AudioFileClip(get_asset_path(timer_sound)).with_start(level_intro_clip.duration + que_duration)
     ans_audio_clip = ans_audio_clip.with_start(intro_duration + que_duration + timer_duration + reveal_duration)
-    ans_bg_clip = AudioFileClip(asset_path / voiceover_bg).with_start(intro_duration + que_duration + timer_duration + reveal_duration).with_duration(ans_duration)
+    ans_bg_clip = AudioFileClip(get_asset_path(voiceover_bg)).with_start(intro_duration + que_duration + timer_duration + reveal_duration).with_duration(ans_duration)
     audios = [
         level_intro_sound_clip,
         que_audio_clip,
@@ -464,21 +478,11 @@ def make_level(data):
         fp.seek(0)
         data = fp.read()
 
-    with open(f'{build_path}/level_{level}.mp4', 'wb') as f:
+    with open(get_build_path(f'level_{level}.mp4'), 'wb') as f:
         f.write(data)
 
-def convertmp3(path):
-    # convert canva mp4 to mp3.
-    for i in range(0, 40):
-        video = VideoFileClip(f'{build_path}/{i+1}.mp4')
-        audio = video.audio
-        if i % 2 == 0:
-            audio.write_audiofile(f'{build_path}/LevelQue_{int((i+1)/2+1)}.mp3')
-        else:
-            audio.write_audiofile(f'{build_path}/LevelAns_{int(i/2)+1}.mp3')
-
 def load_cfg():
-    with open(asset_path / 'config.json') as f:
+    with open(get_asset_path('config.json')) as f:
         return json.load(f)
 
 def make_all_levels(data, args):
@@ -497,22 +501,28 @@ def make_all_levels(data, args):
         print(level_cfg)
 
     for level_cfg in level_cfgs:
-        make_level(level_cfg)
+        if args.shorts:
+            make_level_shorts(level_cfg)
+        else:
+            make_level(level_cfg)
 
     if args.level is not None and args.concat:
-        concat_levels(data)
+        concat_levels(cfg)
 
 
 def concat_levels(data):
-    intros = [asset_path / v for v in data.get('Intro', [])] #["Intro.mp4"]
-    outtros = [asset_path / v for v in data.get('Outtro', [])] #["Outtro.mp4"]
-    videos = intros + [build_path / ('Level_%d.mp4' % (i+1)) for i in range(20)] + outtros
-    videos = [build_path / video for video in videos]
+    intros = [get_asset_path(v) for v in data.get('Intro', [])] #["Intro.mp4"]
+    outtros = [get_asset_path(v) for v in data.get('Outtro', [])] #["Outtro.mp4"]
+    videos = intros + [get_build_path(('Level_%d.mp4' % (i+1))) for i in range(20)] + outtros
+    #videos = [build_path / video for video in videos]
+    final = get_build_path('final.mp4')
+    videolist = get_build_path('videolist.txt')
 
-    if os.path.exists(f'{build_path}/final.mp4'):
-        os.remove(f'{build_path}/final.mp4')
+    if os.path.exists(final):
+        os.remove(final)
 
-    with open(f'{build_path}/videolist.txt', 'w') as f:
+
+    with open(videolist, 'w') as f:
         content = '\n'.join([
             f"file '{video}'" for video in videos
         ])
@@ -520,7 +530,7 @@ def concat_levels(data):
 
     clips = [VideoFileClip(video) for video in videos]
     final_clip = concatenate_videoclips(clips)
-    final_clip.write_videofile(f'{build_path}/final.mp4', fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=6)
+    final_clip.write_videofile(final, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=6)
 
 def shuffle_levels(path):
     with open(path) as f:
@@ -534,43 +544,64 @@ def shuffle_levels(path):
 
 def make_level_images(data):
     prompts = [e['ImagePrompt'] for e in data if e['Level'] > 1]
-    create_midjourney_images(prompts)
+    # TODO
     
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    if not os.path.exists(build_path):
-        os.makedirs(build_path)
+    if not os.path.exists(get_build_path('')):
+        os.makedirs(get_build_path(''))
 
     parser = argparse.ArgumentParser(description='WFQ Helper')
     parser.add_argument('command', type=str, help='Command to run')
-    parser.add_argument('--path', type=str, help='Path to file')
+    parser.add_argument('--config', type=str, help='Path to config file')
+    parser.add_argument('--levels', type=str, help='Path to levels file')
+    parser.add_argument('--outdir', default='./build', type=str, help='Output path')
     parser.add_argument('--level', type=int, help='Level to generate')
-    parser.add_argument('--concat', action='store_false', help='Concat levels')
+    parser.add_argument('--concat', action='store_true', help='Concat levels')
+    parser.add_argument('--shorts', action='store_true', help='Concat levels')
     args = parser.parse_args()
 
-    if args.command == 'convertmp3':
-        convertmp3(args.path)
-    elif args.command == "shufflelevels":
-        shuffle_levels(args.path)
-    elif args.command == 'concatlevels':
-        concat_levels(json.load(sys.stdin)) # use config.json
-    elif args.command == 'levelimages':
+    if args.command == 'levelimages': # TODO
         make_level_images(json.load(sys.stdin))
-    elif args.command == 'level':
+    elif args.command == 'level': # for testing
         make_level(json.load(sys.stdin))
-    elif args.command == 'quevoiceover':
+    elif args.command == 'quevoiceover': # for testing
         make_que_voiceover(json.load(sys.stdin))
-    elif args.command == 'ansvoiceover':
+    elif args.command == 'ansvoiceover': # for testing
         make_ans_voiceover(json.load(sys.stdin))
-    elif args.command == 'allvoiceovers':
-        make_all_voiceovers(json.load(sys.stdin))
+
+    elif args.command == "shufflelevels":
+        shuffle_levels(args.levels)
+    elif args.command == 'voiceovers':
+        with open(args.levels) as f:
+            levels = json.load(f)
+        make_all_voiceovers(levels)
     elif args.command == 'alllevels':
-        make_all_levels(json.load(sys.stdin), args) # use levels.json
+        with open(args.levels) as f:
+            levels = json.load(f)
+        make_all_levels(levels, args) # use levels.json
+        if args.concat:
+            with open(args.config) as f:
+                config = json.load(f)
+            concat_levels(config)
+    elif args.command == 'concatlevels':
+        with open(args.config) as f:
+            config = json.load(f)
+        concat_levels(args.config) # use config.json
+    elif args.command == 'video': # all at once.
+        with open(args.levels) as f:
+            levels = json.load(f)
+        with open(args.config) as f:
+            config = json.load(f)
+        shuffle_levels(args.levels)
+        make_all_voiceovers(levels)
 
     # TODO: download images from midjourney.
     # TODO: add api to call chatgpt to generate questions and answers in json format.
     # TODO: add readme on how to use it.
     # TODO: support loading resources from remote url (like google drive).
     # TODO: make thumbnail
+    # TODO: make shorts: faster pace: 5 seconds per question.
+    # TODO: optimize elevenlabs to reuse some voiceovers.

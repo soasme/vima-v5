@@ -11,3 +11,4 @@ requests
 Pillow
 librosa
 elevenlabs
+selenium

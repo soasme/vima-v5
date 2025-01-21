@@ -1,8 +1,11 @@
+from pathlib import Path
 import os
 import json
 from streamlit_local_storage import LocalStorage
 from datetime import datetime
 from openai import OpenAI
+import numpy as np
+from PIL import Image
 
 import streamlit as st
 
@@ -159,4 +162,94 @@ def display_sidebar():
         env_openai_api_key = os.getenv("OPENAI_API_KEY")
         openai_key = st.text_input("OpenAI API Key", type="password", value=env_openai_api_key or '')
         st.session_state.openai_key = openai_key
+
+def get_asset_path(path):
+    if not os.environ.get('ASSET_PATH'):
+        raise Exception('ASSET_PATH not set')
+    search_paths = os.environ['ASSET_PATH'].split(',')
+    for search_path in search_paths:
+        if Path(search_path).joinpath(path).exists():
+            return Path(search_path).joinpath(path)
+    raise Exception(f'Asset not found: {path}')
+
+def get_build_path(path):
+    if os.environ.get('BUILD_PATH'):
+        return Path(os.environ['BUILD_PATH']) / path
+    if os.environ.get('ASSET_PATH'):
+        search_paths = os.environ['ASSET_PATH'].split(',')
+        last_search_path = search_paths[-1]
+        return Path(last_search_path).joinpath('build') / path
+
+def save_mp4(clip, path):
+    clip.write_videofile(path, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
+
+def blacken_image(image):
+  """
+  Given a PIL.Image, return a new PIL.Image with black color 
+  for any pixel in the parameter image. Transparent parts are left untouched.
+
+  This version uses NumPy for faster processing.
+
+  Args:
+    image: The input PIL.Image object.
+
+  Returns:
+    A new PIL.Image object with black color for non-transparent pixels.
+  """
+  # Convert image to NumPy array
+  img_array = np.array(image) 
+
+  # Create a mask for non-transparent pixels
+  alpha_mask = img_array[:, :, 3] > 0 
+
+  # Create a black image with the same shape
+  black_img = np.zeros_like(img_array)
+
+  # Set non-transparent pixels to black
+  black_img[alpha_mask] = [0, 0, 0, 255] 
+
+  # Convert back to PIL Image
+  new_image = Image.fromarray(black_img.astype('uint8')) 
+
+  return new_image
+
+def mask_alpha(input_image_path, output_mask_path, 
+                    transparent_mask_color=(255, 255, 255, 0),
+                    translucency_mask_color=(0, 0, 0),
+                    opacity_mask_color=(255, 255, 255)):
+    """
+    Creates an alpha mask from a PNG image.
+
+    Args:
+        input_image_path (str): Path to the input PNG image.
+        output_mask_path (str): Path to save the generated alpha mask.
+        transparent_mask_color (tuple): RGBA color for fully transparent pixels.
+        translucency_mask_color (tuple): RGB color for semi-transparent pixels.
+        opacity_mask_color (tuple): RGB color for fully opaque pixels.
+    """
+    # Open the input image
+    image = Image.open(input_image_path).convert("RGBA")
+    width, height = image.size
+
+    # Create a new image for the alpha mask
+    alpha_mask = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    pixels = image.load()
+    mask_pixels = alpha_mask.load()
+
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = pixels[x, y]  # Get the RGBA values
+
+            if a == 0:
+                # Fully transparent
+                mask_pixels[x, y] = transparent_mask_color
+            elif 0 < a < 255:
+                # Semi-transparent
+                mask_pixels[x, y] = translucency_mask_color + (255,)
+            else:
+                # Fully opaque
+                mask_pixels[x, y] = opacity_mask_color + (255,)
+
+    # Save the alpha mask
+    alpha_mask.save(output_mask_path, "PNG")
 
