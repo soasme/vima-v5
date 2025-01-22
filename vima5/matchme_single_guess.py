@@ -53,7 +53,12 @@ Example config:
   "reveal_mask_color": [0, 0, 0, 255],
   "reveal_mask_transparency": 0.5,
   "reveal_text": "Pterasaurus",
+  "reveal_text_font_size": 200,
+  "reveal_text_stroke_width": 20,
+  "reveal_text_stroke_color": "black",
+  "reveal_text_fadein": 0.5,
   "reveal_text_delay": 1.0,
+  "reveal_text_margin": [100, 100],
   "reveal_text_pos": ["right", "bottom"],
   "reveal_image_flip": true,
   "reveal_image_pos": "left",
@@ -96,6 +101,11 @@ class Config:
     reveal_mask_color: List[int] = field(default_factory=lambda: [0, 0, 0, 255])
     reveal_mask_transparency: float = 0.5
     reveal_text: str = ""
+    reveal_text_font_size: int = 200
+    reveal_text_stroke_width: int = 20
+    reveal_text_stroke_color: str = "black"
+    reveal_text_fadein: float = 0.5
+    reveal_text_margin: List[int] = field(default_factory=lambda: [100, 100])
     reveal_text_delay: float = 1.0
     reveal_text_pos: List[str] = field(default_factory=lambda: ["right", "bottom"])
     reveal_image_flip: bool = True
@@ -147,8 +157,8 @@ def make_video(args):
     # Create pulsing question mark
     # TODO: make font_size, color, configurable
     # TODO: question mark seems to be cut-off a bit.
-    question_text = TextClip(text="?", font_size=80, color='black',
-                             font='./assets/from-cartoon-blocks.ttf')
+    question_text = TextClip(text="?", font_size=100, color='black',
+                             font='Arial', margin=(10, 10))
     def pulse_scale(t):
         scale = 1 + 0.2 * math.sin(2 * math.pi * t)  # Pulse between 0.8 and 1.2
         return scale
@@ -220,7 +230,14 @@ def make_video(args):
 
     character = ImageClip(np.array(character_image))
     character_height = video_size[1] * config.reveal_image_ratio
-    character = character.with_effects([vfx.Resize(height=character_height)])
+    character = (
+        character
+        .with_duration(config.reveal_duration)
+        .with_effects([
+            vfx.Resize(height=character_height),
+            vfx.CrossFadeIn(config.reveal_text_fadein),
+        ])
+    )
     
     def reveal_position(t):
         if config.reveal_image_pos == 'left':
@@ -235,16 +252,16 @@ def make_video(args):
     
     # Create reveal text
     reveal_text = (TextClip(text=config.reveal_text,
-                            font_size=200,
+                            font_size=config.reveal_text_font_size,
                             color='white',
-                            stroke_color='black',
-                            stroke_width=20,
-                            margin=(100, 100),
+                            stroke_color=config.reveal_text_stroke_color,
+                            stroke_width=config.reveal_text_stroke_width,
+                            margin=tuple(config.reveal_text_margin),
                             font='Arial')
                    .with_position(config.reveal_text_pos)
                    .with_start(current_time + config.reveal_text_delay)
                    .with_duration(config.reveal_duration - config.reveal_text_delay)
-                   .with_effects([vfx.CrossFadeIn(0.5)])
+                   .with_effects([vfx.CrossFadeIn(config.reveal_text_fadein)])
                    )
 
     current_time += mask.duration
