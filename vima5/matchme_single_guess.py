@@ -141,7 +141,7 @@ def make_video(args):
     outline = (
         outline
         .with_position("center")
-        .with_effects([vfx.Resize(height=video_size[1] * 0.5)])
+        .with_effects([vfx.Resize(height=video_size[1] * 0.6)])
     )
 
     # Create pulsing question mark
@@ -162,17 +162,28 @@ def make_video(args):
     current_time = config.first_guess_delay
     for choice in config.choices + [config.character_image]:
         choice_image = ImageClip(get_asset_path(choice))
+
+        choice_image = choice_image.with_start(current_time)
+        duration = 2
+        if choice == config.character_image:
+            duration += config.reveal_duration
+
         choice_image = (
             choice_image
             .with_start(current_time)
-            .with_duration(2) # TODO need to know reveal duration and set for character choice here.
-            .with_effects([
-                vfx.CrossFadeIn(0.5),
-                vfx.Resize(height=video_size[1] * 0.5),
-                vfx.CrossFadeOut(0.5)
-            ])
-            .with_position("center")
+            .with_duration(duration)
+            .with_position('center')
         )
+
+        fx = [
+            vfx.CrossFadeIn(0.5),
+            vfx.Resize(height=video_size[1] * 0.6),
+        ]
+        if choice != config.character_image:
+            fx.append(vfx.CrossFadeOut(0.5))
+
+        choice_image = choice_image.with_effects(fx)
+
         choice_clip = choice_image
         choice_clips.append(choice_clip)
 
@@ -185,14 +196,17 @@ def make_video(args):
                 congrats
                 .with_position(("right", "bottom"))
                 .with_duration(config.congrats_duration)
-                .with_start(current_time)
+                .with_start(current_time + 1.0)
                 .with_effects([
                     vfx.CrossFadeIn(0.5),
                     vfx.CrossFadeOut(0.5),
                 ])
             )
 
-        current_time += choice_image.duration + config.guess_gap_seconds    
+        current_time += 2
+        if choice != config.character_image:
+            current_time += config.guess_gap_seconds
+
 
 
     mask = ColorClip(video_size, color=config.reveal_mask_color)
@@ -200,14 +214,46 @@ def make_video(args):
     mask = mask.with_start(current_time)
     mask = mask.with_duration(config.reveal_duration)
 
+    character_image = Image.open(get_asset_path(config.character_image))
+    if config.reveal_image_flip:
+        character_image = character_image.transpose(Image.FLIP_LEFT_RIGHT)
+
+    character = ImageClip(np.array(character_image))
+    character_height = video_size[1] * config.reveal_image_ratio
+    character = character.with_effects([vfx.Resize(height=character_height)])
+    
+    def reveal_position(t):
+        if config.reveal_image_pos == 'left':
+            return ('left', 'center')
+        else:
+            return ('right', 'center')
+    
+    character = (character
+                .with_position(reveal_position)
+                .with_start(current_time)
+                .with_duration(config.reveal_duration))
+    
+    # Create reveal text
+    reveal_text = (TextClip(text=config.reveal_text,
+                            font_size=200,
+                            color='white',
+                            stroke_color='black',
+                            stroke_width=20,
+                            margin=(100, 100),
+                            font='Arial')
+                   .with_position(config.reveal_text_pos)
+                   .with_start(current_time + config.reveal_text_delay)
+                   .with_duration(config.reveal_duration - config.reveal_text_delay)
+                   .with_effects([vfx.CrossFadeIn(0.5)])
+                   )
+
     current_time += mask.duration
 
     # Compose final video
     final = CompositeVideoClip(
         [background, outline, question_mark] +
         choice_clips +
-        [mask, congrats, ],
-        #[congrats, mask, character, reveal_text],
+        [congrats, mask, character, reveal_text],
         size=video_size
     ).with_duration(current_time)
 
