@@ -42,6 +42,7 @@ Example config:
     "Pterasaurus.png"
   ],
   "guess_gap_seconds": 1.0,
+  "guess_duration": 2.0,
   "outline_border": "black",
   "outline_fill": "white",
   "outline_shadow": "black",
@@ -90,6 +91,7 @@ class Config:
     character_image: str = ""
     choices: List[str] = field(default_factory=lambda: [])
     guess_gap_seconds: float = 1.0
+    guess_duration: float = 2.0
     outline_border: str = "black"
     outline_fill: str = "white"
     outline_shadow: str = "black"
@@ -155,9 +157,7 @@ def make_video(args):
     )
 
     # Create pulsing question mark
-    # TODO: make font_size, color, configurable
-    # TODO: question mark seems to be cut-off a bit.
-    question_text = TextClip(text="?", font_size=100, color='black',
+    question_text = TextClip(text="?", font_size=200, color='black',
                              font='Arial', margin=(10, 10))
     def pulse_scale(t):
         scale = 1 + 0.2 * math.sin(2 * math.pi * t)  # Pulse between 0.8 and 1.2
@@ -166,15 +166,20 @@ def make_video(args):
                      .with_position('center')
                      .with_effects([vfx.Resize(pulse_scale)]))
 
+    # Create answer cohice popup
+    choice_icon_clips = []
+
+
     # Create answer choice clips
 
     choice_clips = []
     current_time = config.first_guess_delay
+    # TODO: 1s stay, 0.5 slide x -halfscreen
     for choice in config.choices + [config.character_image]:
         choice_image = ImageClip(get_asset_path(choice))
 
         choice_image = choice_image.with_start(current_time)
-        duration = 2
+        duration = config.guess_duration
         if choice == config.character_image:
             duration += config.reveal_duration
 
@@ -213,7 +218,7 @@ def make_video(args):
                 ])
             )
 
-        current_time += 2
+        current_time += config.guess_duration
         if choice != config.character_image:
             current_time += config.guess_gap_seconds
 
@@ -269,10 +274,13 @@ def make_video(args):
     # Compose final video
     final = CompositeVideoClip(
         [background, outline, question_mark] +
+        choice_icon_clips +
         choice_clips +
         [congrats, mask, character, reveal_text],
         size=video_size
     ).with_duration(current_time)
+
+    print(f"Final duration: {final.duration}")
 
     
     # Save video
@@ -288,6 +296,10 @@ def main():
     parser.add_argument('--config', type=str, help='Path to config file')
     parser.add_argument('--shorts', action='store_true', help='Concat levels')
     args = parser.parse_args()
+
+    build_path = get_build_path('')
+    if not os.path.exists(build_path):
+        os.makedirs(build_path)
 
     if args.command == 'video':
         make_video(args)

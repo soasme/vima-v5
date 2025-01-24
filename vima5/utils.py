@@ -178,10 +178,10 @@ def get_build_path(path):
     if os.environ.get('ASSET_PATH'):
         search_paths = os.environ['ASSET_PATH'].split(',')
         last_search_path = search_paths[-1]
-        return Path(last_search_path).joinpath('build') / path
+        return Path(last_search_path) / 'build' / path
 
-def save_mp4(clip, path):
-    clip.write_videofile(path, fps=24, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
+def save_mp4(clip, path, fps=24):
+    clip.write_videofile(path, fps=fps, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
 
 def blacken_image(image):
   """
@@ -253,3 +253,14 @@ def mask_alpha(input_image_path, output_mask_path,
     # Save the alpha mask
     alpha_mask.save(output_mask_path, "PNG")
 
+class Animation:
+
+    @staticmethod
+    def pan():
+        def _(t):
+            if t < 0.5 * t:
+                scale = 0.2
+            else:
+                scale = 0.2 + 0.02 * math.sin(2 * math.pi * t)
+            return scale
+        return t
