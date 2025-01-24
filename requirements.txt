@@ -11,4 +11,5 @@ requests
 Pillow
 librosa
 elevenlabs
-selenium
+rembg
+onnxruntime
