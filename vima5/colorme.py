@@ -181,7 +181,7 @@ def make_rembg(args):
         opacity_mask_color=(0, 0, 0),
     )
 
-def make_video2(args):
+def make_video(args):
     """
     """
     image_path = get_asset_path(args.image)
@@ -293,7 +293,7 @@ def main():
         os.makedirs(build_dir)
 
     if args.command == 'video':
-        make_video2(args)
+        make_video(args)
     if args.command == 'rembg':
         make_rembg(args)
     elif args.command == 'alphamask':
