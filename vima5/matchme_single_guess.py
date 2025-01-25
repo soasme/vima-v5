@@ -75,10 +75,11 @@ import sys
 import logging
 import random
 from dataclasses import dataclass, field
+from rembg import remove as rembg
 from typing import List, Dict
 import numpy as np
 from PIL import Image
-from vima5.utils import get_asset_path, get_build_path, mask_alpha
+from vima5.utils import get_asset_path, get_build_path, mask_alpha, make_rembg
 from moviepy import *
 logger = logging.getLogger(__name__)
 
@@ -138,22 +139,21 @@ def make_video(args):
 
     background = get_background_clip(config)
 
+    # Create black and rembg image for all choices.
+    for choice in config.choices + [config.character_image]:
+        if (os.path.exists(get_build_path(f"{config.id}_black.png"))
+            and os.path.exists(get_build_path(f"{config.id}_rembg.png"))):
+            continue
+        make_rembg(choice)
+
     # Create outline image from character image
-    character_image = Image.open(get_asset_path(config.character_image))
-    outline_path = get_build_path(f"{config.id}_outline.png")
-    mask_alpha(get_asset_path(config.character_image), outline_path)
-    mask_alpha(
-        get_asset_path(config.character_image),
-        outline_path,
-        transparent_mask_color=(255, 255, 255, 0),
-        translucency_mask_color=(0, 0, 0),
-        opacity_mask_color=(255, 255, 255)
-    )
-    outline = ImageClip(outline_path)
+    outline = ImageClip(get_build_path(f"{config.id}_black.png"))
     outline = (
         outline
         .with_position("center")
-        .with_effects([vfx.Resize(height=video_size[1] * 0.6)])
+        .with_effects([
+            vfx.Resize(0.8),
+        ])
     )
 
     # Create pulsing question mark
@@ -169,14 +169,15 @@ def make_video(args):
     # Create answer cohice popup
     choice_icon_clips = []
 
-
     # Create answer choice clips
 
     choice_clips = []
     current_time = config.first_guess_delay
     # TODO: 1s stay, 0.5 slide x -halfscreen
     for choice in config.choices + [config.character_image]:
-        choice_image = ImageClip(get_asset_path(choice))
+        choice_image = ImageClip(np.array(
+            rembg(Image.open(get_asset_path(choice)).convert('RGBA'))
+        ))
 
         choice_image = choice_image.with_start(current_time)
         duration = config.guess_duration
@@ -192,7 +193,7 @@ def make_video(args):
 
         fx = [
             vfx.CrossFadeIn(0.5),
-            vfx.Resize(height=video_size[1] * 0.6),
+            vfx.Resize(0.8),
         ]
         if choice != config.character_image:
             fx.append(vfx.CrossFadeOut(0.5))
@@ -229,18 +230,17 @@ def make_video(args):
     mask = mask.with_start(current_time)
     mask = mask.with_duration(config.reveal_duration)
 
-    character_image = Image.open(get_asset_path(config.character_image))
+    character_image = rembg(Image.open(get_asset_path(config.character_image)).convert('RGBA'))
     if config.reveal_image_flip:
         character_image = character_image.transpose(Image.FLIP_LEFT_RIGHT)
 
     character = ImageClip(np.array(character_image))
-    character_height = video_size[1] * config.reveal_image_ratio
     character = (
         character
         .with_duration(config.reveal_duration)
         .with_effects([
-            vfx.Resize(height=character_height),
             vfx.CrossFadeIn(config.reveal_text_fadein),
+            vfx.Resize(0.8),
         ])
     )
     
