@@ -67,6 +67,8 @@ Example config:
 }
 """
 
+
+
 import argparse
 import os
 import math
@@ -82,6 +84,8 @@ from PIL import Image
 from vima5.utils import get_asset_path, get_build_path, mask_alpha, make_rembg
 from moviepy import *
 logger = logging.getLogger(__name__)
+
+QUIZ_RATIO = 0.8
 
 @dataclass
 class Config:
@@ -113,7 +117,7 @@ class Config:
     reveal_text_pos: List[str] = field(default_factory=lambda: ["right", "bottom"])
     reveal_image_flip: bool = True
     reveal_image_pos: str = "left"
-    reveal_image_ratio: float = 0.8
+    reveal_image_ratio: float = QUIZ_RATIO
 
 
 def read_config(path):
@@ -141,18 +145,18 @@ def make_video(args):
 
     # Create black and rembg image for all choices.
     for choice in config.choices + [config.character_image]:
-        if (os.path.exists(get_build_path(f"{config.id}_black.png"))
-            and os.path.exists(get_build_path(f"{config.id}_rembg.png"))):
+        if (os.path.exists(get_build_path(choice.replace('.png', '_black.png'))) and
+            os.path.exists(get_build_path(choice.replace('.png', '_rembg.png')))):
             continue
         make_rembg(choice)
 
     # Create outline image from character image
-    outline = ImageClip(get_build_path(f"{config.id}_black.png"))
+    outline = ImageClip(get_build_path(config.character_image.replace('.png', '_black.png')))
     outline = (
         outline
         .with_position("center")
         .with_effects([
-            vfx.Resize(0.8),
+            vfx.Resize(QUIZ_RATIO),
         ])
     )
 
@@ -160,7 +164,7 @@ def make_video(args):
     question_text = TextClip(text="?", font_size=200, color='black',
                              font='Arial', margin=(10, 10))
     def pulse_scale(t):
-        scale = 1 + 0.2 * math.sin(2 * math.pi * t)  # Pulse between 0.8 and 1.2
+        scale = 1 + 0.2 * math.sin(2 * math.pi * t)  # Pulse between QUIZ_RATIO and 1.2
         return scale
     question_mark = (question_text
                      .with_position('center')
@@ -174,26 +178,29 @@ def make_video(args):
     choice_clips = []
     current_time = config.first_guess_delay
     # TODO: 1s stay, 0.5 slide x -halfscreen
+
     for choice in config.choices + [config.character_image]:
-        choice_image = ImageClip(np.array(
-            rembg(Image.open(get_asset_path(choice)).convert('RGBA'))
-        ))
+        choice_image = ImageClip(get_build_path(choice.replace('.png', '_rembg.png')))
 
         choice_image = choice_image.with_start(current_time)
         duration = config.guess_duration
         if choice == config.character_image:
             duration += config.reveal_duration
 
+        def choice_pos(t):
+            # 0.5s scroll from top to center (half bottom show up), stay, 0.5s scroll from center to bottom (half top show up)
+            return ('center', 'center')
+
         choice_image = (
             choice_image
             .with_start(current_time)
             .with_duration(duration)
-            .with_position('center')
+            .with_position(choice_pos)
         )
 
         fx = [
-            vfx.CrossFadeIn(0.5),
-            vfx.Resize(0.8),
+            #vfx.CrossFadeIn(0.5),
+            vfx.Resize(QUIZ_RATIO),
         ]
         if choice != config.character_image:
             fx.append(vfx.CrossFadeOut(0.5))
@@ -230,7 +237,7 @@ def make_video(args):
     mask = mask.with_start(current_time)
     mask = mask.with_duration(config.reveal_duration)
 
-    character_image = rembg(Image.open(get_asset_path(config.character_image)).convert('RGBA'))
+    character_image = Image.open(get_build_path(config.character_image.replace('.png', '_rembg.png')))
     if config.reveal_image_flip:
         character_image = character_image.transpose(Image.FLIP_LEFT_RIGHT)
 
@@ -240,7 +247,7 @@ def make_video(args):
         .with_duration(config.reveal_duration)
         .with_effects([
             vfx.CrossFadeIn(config.reveal_text_fadein),
-            vfx.Resize(0.8),
+            vfx.Resize(QUIZ_RATIO),
         ])
     )
     
