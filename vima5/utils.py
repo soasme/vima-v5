@@ -4,6 +4,7 @@ import json
 from streamlit_local_storage import LocalStorage
 from datetime import datetime
 from openai import OpenAI
+from rembg import remove as rembg
 import numpy as np
 from PIL import Image
 
@@ -13,6 +14,38 @@ STAGE_LYRICS = 1
 STAGE_SONG = 2
 STAGE_TIMESTAMP = 3
 STAGE_STORYBOARD = 4
+
+RATIO_MAP = {
+    '16:9': 16/9,
+    '9:16': 9/16,
+    '4:3': 4/3,
+    '3:4': 3/4,
+    '1:1': 1/1,
+}
+
+RESOLUTION_MAP = {
+    '1080p': {
+        '16:9': (1920, 1080),
+        '9:16': (1080, 1920),
+        '4:3': (1440, 1080),
+        '3:4': (810, 1080),
+        '1:1': (1080, 1080),
+    },
+    '720p': {
+        '16:9': (1280, 720),
+        '9:16': (720, 1280),
+        '4:3': (960, 720),
+        '3:4': (540, 720),
+        '1:1': (720, 720),
+    },
+    '480p': {
+        '16:9': (640, 480),
+        '9:16': (480, 640),
+        '4:3': (640, 480),
+        '3:4': (360, 480),
+        '1:1': (480, 480),
+    },
+}
 
 def get_openai_client():
     return OpenAI(api_key=st.session_state.openai_key)
@@ -179,6 +212,7 @@ def get_build_path(path):
         search_paths = os.environ['ASSET_PATH'].split(',')
         last_search_path = search_paths[-1]
         return Path(last_search_path) / 'build' / path
+    return Path('.') / 'build' / path
 
 def save_mp4(clip, path, fps=24):
     clip.write_videofile(path, fps=fps, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
@@ -264,3 +298,17 @@ class Animation:
                 scale = 0.2 + 0.02 * math.sin(2 * math.pi * t)
             return scale
         return t
+
+
+def make_rembg(image):
+    image_path = get_asset_path(image)
+    black_path = get_build_path(os.path.splitext(os.path.basename(image))[0] + "_black.png")
+    rembg_path = get_build_path(os.path.splitext(os.path.basename(image))[0] + "_rembg.png")
+    image = Image.open(image_path).convert("RGBA")
+    rembg_image = rembg(image)
+    rembg_image.save(rembg_path)
+    mask_alpha(rembg_path, black_path,
+        translucency_mask_color=(0, 0, 0),
+        transparent_mask_color=(0, 0, 0, 0),
+        opacity_mask_color=(0, 0, 0),
+    )
