@@ -182,8 +182,6 @@ def make_rembg(args):
     )
 
 def make_video(args):
-    """
-    """
     image_path = get_asset_path(args.image)
     rembg_path = get_build_path(os.path.splitext(os.path.basename(args.image))[0] + "_rembg.png")
     black_path = get_build_path(os.path.splitext(os.path.basename(args.image))[0] + "_black.png")

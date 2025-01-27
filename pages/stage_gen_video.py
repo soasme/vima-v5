@@ -18,6 +18,7 @@ def validate_schema(schema_str: str) -> Optional[Dict]:
         st.error(f"Invalid JSON: {str(e)}")
         return None
 
+
 def generate_video(schema: Dict, preview_resolution: str, download_resolution: str) -> tuple:
     """Generate both preview and download versions of the video."""
     # Create temporary directories for assets and output

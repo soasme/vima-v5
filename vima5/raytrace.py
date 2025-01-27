@@ -3,7 +3,10 @@ import numpy as np
 from typing import List, Tuple, Dict
 import io
 from moviepy import ImageSequenceClip
+import moviepy.video.fx as vfx
 import math
+
+from vima5.utils import save_mp4
 
 def create_shadow_mask(image: Image.Image) -> Image.Image:
     """Creates a grayscale shadow mask from an RGBA image."""
@@ -20,7 +23,6 @@ def resize_by_depth(image: Image.Image, depth: float, base_size: Tuple[int, int]
     scale = 1 + (1 - depth) * 0.2
     new_width = int(image.size[0] * scale)
     new_height = int(image.size[1] * scale)
-    print(new_width, new_height)
     return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 def calculate_swing_position(frame: int, total_frames: int, layer_index: int) -> Tuple[float, float]:
@@ -29,26 +31,26 @@ def calculate_swing_position(frame: int, total_frames: int, layer_index: int) ->
     Returns: (y_offset, current_depth)
     """
     # Delay start for each layer
-    start_frame = layer_index * 15
+    start_frame = 10 # layer_index * 15
     if frame < start_frame:
-        return (-1.0, 1.0)  # Above screen
+        return (-1.5, 1.0)  # Above screen
     
     adjusted_frame = frame - start_frame
     
     # Initial drop
-    drop_frames = 10
+    drop_frames = 3
     if adjusted_frame < drop_frames:
         progress = adjusted_frame / drop_frames
-        return (progress - 1.0, 1.0)
+        return (progress - 1.0, 1.0) # drop to 3/4 of the screen
     
     # Pendulum swing motion
     swing_frame = adjusted_frame - drop_frames
     
     # Natural pendulum period
-    swing_period = 30 # Frames per swing (slower swing)
+    swing_period = 50 # Frames per swing (slower swing)
     
     # Calculate angle using pendulum motion
-    max_angle = math.pi / 20  # 18 degrees maximum swing
+    max_angle = math.pi /  20
     damping = math.exp(-swing_frame * 0.002)  # Slower damping
     angle = max_angle * math.sin(swing_frame * 2 * math.pi / swing_period) * damping
     
@@ -94,7 +96,7 @@ def process_frame(layers: List[Dict], frame: int, total_frames: int, base_size: 
         shadow_mask = create_shadow_mask(resized_image)
         
         # Calculate shadow offset based on current depth
-        shadow_offset = int(20 * (1 - current_depth))
+        shadow_offset = int(100 * (1 - current_depth))
         
         # Create layer canvas
         layer_canvas = Image.new('RGBA', base_size, (0, 0, 0, 0))
@@ -106,7 +108,7 @@ def process_frame(layers: List[Dict], frame: int, total_frames: int, base_size: 
         # Paste shadow
         shadow_image = Image.new('RGBA', base_size, (0, 0, 0, 0))
         shadow_pos_y = min(pos_y + shadow_offset, base_size[1] - shadow_mask.size[1])
-        shadow_image.paste((0, 0, 0, 255), (pos_x + shadow_offset, shadow_pos_y), shadow_mask)
+        shadow_image.paste((0, 0, 0, 255), (pos_x + shadow_offset, shadow_pos_y + shadow_offset), shadow_mask)
         shadow_image = shadow_image.filter(ImageFilter.BoxBlur(radius=10))
         
         # Composite shadow and image
@@ -147,7 +149,7 @@ def create_animation(layers: List[Dict], output_path: str, fps: int = 30, durati
         processed_layers.append({'image': img, 'depth': layer['depth']})
     
     if base_size is None:
-        base_size = (800, 600)  # Default size
+        base_size = (1920, 1080)  # Default size
     
     # Generate frames
     total_frames = fps * duration
@@ -160,14 +162,14 @@ def create_animation(layers: List[Dict], output_path: str, fps: int = 30, durati
     
     # Create video
     clip = ImageSequenceClip(frames, fps=fps)
-    clip.write_videofile(output_path, fps=fps)
+    save_mp4(clip, '/tmp/output.mp4')
 
 # Example usage
 def example_usage():
     # Create sample images
-    bg = Image.new('RGBA', (800, 600), (255, 255, 255, 255))
+    #bg = Image.new('RGBA', (1920, 1080), (255, 255, 255, 255))
+    bg = Image.open('/Users/soasme/Downloads/BG.png')
     circle = Image.new('RGBA', (200, 200), (0, 0, 0, 0))
-    square = Image.new('RGBA', (150, 150), (255, 0, 0, 255))
     
     # Draw a circle
     for x in range(200):
@@ -177,7 +179,6 @@ def example_usage():
     
     layers = [
         {'image': bg, 'depth': 1.0},      # Background (static)
-        {'image': square, 'depth': 0.9},   # Middle layer (will swing)
         {'image': circle, 'depth': 0.9}    # Top layer (will swing)
     ]
     

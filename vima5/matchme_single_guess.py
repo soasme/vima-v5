@@ -187,28 +187,47 @@ def make_video(args):
         if choice == config.character_image:
             duration += config.reveal_duration
 
-        def choice_pos(t):
+        #def choice_pos(t):
             # 0.5s scroll from top to center (half bottom show up), stay, 0.5s scroll from center to bottom (half top show up)
-            return ('center', 'center')
+        #    return ('center', 'center')
 
+        # Show an surprise egg. (632x864)
+        # Add a bounce effect.
+        #egg = ImageClip(get_asset_path("SurpriseEggPink.png")).with_position(choice_pos).with_start(current_time).with_duration(1.0).with_position(lambda t: (
+        #    (1920-632)/2,
+        #    (1080-864)/2 + 10 * math.sin(3 * t),
+        #))
+
+        # Show an explosion gif
+        #explosion = VideoFileClip(get_asset_path("Explode.gif"), has_mask=True)
+        #explosion = explosion.with_start(current_time+1.0).with_duration(1.0).with_position('center')
+
+        # Show the choice image
+        # TODO: Add a bounce effect.
         choice_image = (
             choice_image
-            .with_start(current_time)
+            .with_start(current_time+1.0)
             .with_duration(duration)
-            .with_position(choice_pos)
+            .with_position('center')
         )
 
         fx = [
-            #vfx.CrossFadeIn(0.5),
             vfx.Resize(QUIZ_RATIO),
+            vfx.SlideIn(0.5, side='right'),
+            vfx.CrossFadeIn(0.5),
         ]
         if choice != config.character_image:
+            fx.append(vfx.SlideOut(0.5, side='right'))
             fx.append(vfx.CrossFadeOut(0.5))
 
         choice_image = choice_image.with_effects(fx)
 
         choice_clip = choice_image
-        choice_clips.append(choice_clip)
+        choice_clips.extend([
+            #egg,
+            choice_clip,
+            #explosion,
+        ])
 
         if choice == config.character_image:
             outline = outline.with_end(current_time)
