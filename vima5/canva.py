@@ -19,18 +19,19 @@ logger.setLevel(logging.DEBUG)
 
 @dataclass
 class Element:
-    align: str = 'center'
-    width: float = 1920
-    height: float = 1080
+    align: str = 'none'
+    width: float = 810
+    height: float = 540
     x: float = 0.0
     y: float = 0.0
     rotate: float = 0.0
     opacity: float = 1.0
-    start_time: float = 0.0
-    end_time: float = 0.0
+    start_time: float = 0.0 # Relative to page start
+    end_time: float = 0.0 # Relative to page end
     flip_horizontal: bool = False
     flip_vertical: bool = False
     clip: Optional[VideoClip] = None
+    builder: 'CanvaBuilder' = None
     
     def position(self) -> tuple:
         """Calculate final position based on alignment and coordinates"""
@@ -41,6 +42,27 @@ class Element:
         # Add more alignment options as needed
         return (self.x, self.y)
 
+    def render(self) -> List[VideoClip]:
+        """Render the element into a list of clips"""
+        clip = self.clip
+        if self.opacity != 1.0:
+            clip = clip.with_opacity(self.opacity)
+
+        fx = []
+        if self.flip_horizontal:
+            fx.append(vfx.MirroX())
+        if self.flip_vertical:
+            fx.append(vfx.MirroY())
+        if self.rotate != 0:
+            fx.append(vfx.Rotate(self.rotate))
+
+        clip = clip.with_effects(fx)
+
+        pos = self.position()
+        clip = clip.with_position(pos)
+
+        return [clip]
+
 @dataclass
 class Page:
     color: str = 'white'
@@ -49,11 +71,35 @@ class Page:
     animate: str = 'none'
     animate_config: Dict = field(default_factory=dict)
     elements: List[Element] = field(default_factory=list)
+    builder: 'CanvaBuilder' = None
     
-    def add_element(self, element: Element) -> 'Page':
+    def add(self, element: Element) -> 'Page':
         """Add an element to the page and return self for chaining"""
         self.elements.append(element)
         return self
+
+    def render(self):
+        clips = []
+
+        # Page always has a background.
+        # XXX: support attaching image/video as background
+        background = (
+            ColorClip(
+                size=(1920, 1080),
+                color=ImageColor.getcolor(self.background, "RGB"),
+            )
+            .with_duration(self.duration)
+        )
+        clips.append(background)
+
+        # Append all elements to the page
+        for element in self.elements:
+            element_clips = element.render()
+
+            # XXX: apply page animation to elements.
+            clips.extend(element_clips)
+
+        return clips
 
 class CanvaBuilder:
     def __init__(self):
@@ -63,24 +109,30 @@ class CanvaBuilder:
     
     def page(self, **kwargs) -> Page:
         """Create and add a new page"""
-        page = Page(**kwargs)
+        page = Page(builder=self, **kwargs)
         self.pages.append(page)
         return page
     
     def text(self, text: str, **kwargs) -> Element:
         """Create a text element"""
-        clip = mpy.TextClip(text, font='Arial', size=(kwargs.get('width', 400), kwargs.get('height', 100)))
-        return Element(clip=clip, **kwargs)
+        clip = TextClip(
+            text=text,
+            font='Arial',
+            font_size=kwargs.pop('font_size', 24),
+            color=kwargs.pop('color', 'black'),
+            size=(kwargs.get('width', 400),
+                  kwargs.get('height', 100)))
+        return Element(builder=self, clip=clip, **kwargs)
     
     def image(self, path: str, **kwargs) -> Element:
         """Create an image element"""
-        clip = mpy.ImageClip(path)
-        return Element(clip=clip, **kwargs)
+        clip = ImageClip(path)
+        return Element(builder=self, clip=clip, **kwargs)
     
     def video(self, path: str, **kwargs) -> Element:
         """Create a video element"""
         clip = VideoFileClip(path)
-        return Element(clip=clip, **kwargs)
+        return Element(builder=self, clip=clip, **kwargs)
     
     def _apply_animations(self, clip: VideoClip, animate: str, config: Dict) -> VideoClip:
         """Apply animations to a clip"""
@@ -94,53 +146,37 @@ class CanvaBuilder:
         elif animate == 'fade':
             return clip.fadeout(config.get('duration', 1.0))
         return clip
-    
+
     def _render(self, output_path: str = 'output.mp4'):
-        """Render all pages into a final video"""
         clips = []
-        
+        current_time = 0.0
         for page in self.pages:
-            # Create background
-            bg = ColorClip(size=(self.width, self.height), color=ImageColor.getcolor(page.background, "RGB"))
-            bg = bg.with_duration(page.duration)
-            
-            # Process elements
-            elements = []
-            for elem in page.elements:
-                clip = elem.clip
-                
-                # Apply transformations
-                if elem.flip_horizontal:
-                    clip = clip.fx(mpy.vfx.mirror_x)
-                if elem.flip_vertical:
-                    clip = clip.fx(mpy.vfx.mirror_y)
-                if elem.rotate != 0:
-                    clip = clip.rotate(elem.rotate)
-                if elem.opacity != 1.0:
-                    clip = clip.with_opacity(elem.opacity)
-                
-                # Set timing
-                if elem.end_time > elem.start_time:
-                    clip = clip.with_start(elem.start_time)
-                    clip = clip.with_end(elem.end_time)
-                else:
+            page_clips = []
+
+            # Turn all clip relative start_time/end_time to absolute
+            for clip in page.render():
+                clip = clip.with_start(clip.start + current_time)
+                if clip.duration is None:
                     clip = clip.with_duration(page.duration)
-                
-                # Set position
-                pos = elem.position()
-                clip = clip.with_position(pos)
-                
-                elements.append(clip)
-            
-            # Compose page
-            page_clip = mpy.CompositeVideoClip([bg] + elements)
-            
-            # Apply page animations
-            if page.animate != 'none':
-                page_clip = self._apply_animations(page_clip, page.animate, page.animate_config)
-            
-            clips.append(page_clip)
-        
+                if clip.end is None or clip.end == 0:
+                    clip = clip.with_end(clip.start + clip.duration)
+                elif clip.end > 0:
+                    clip = clip.with_end(clip.end + clip.end)
+                page_clips.append(clip)
+
+            # Make sure all page clips are within the page duration
+            page_clips = [
+                (clip if not clip.duration or clip.duration <= page.duration else clip.with_duration(page.duration))
+                for clip in page_clips
+            ]
+
+            clips.extend(page_clips)
+
+            current_time += page.duration
+
+        for clip in clips:
+            logger.debug(f"Clip: {clip}, start: {clip.start}, end: {clip.end}, duration: {clip.duration}, pos {clip.pos}, size {clip.size}")
+
         # Concatenate all pages
         if not clips:
             logger.warning("No pages to render")
