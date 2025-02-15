@@ -232,36 +232,13 @@ def make_video(args):
         .with_duration(args.duration-args.draw_duration)
     )
 
-    crayon_clip = (
-        ImageClip(crayon_path)
-        .with_effects([vfx.Resize(height=300)])
-    )
-    margin = (1920 - draw_clip.size[0]) // 2
-    def crayon_position(t):
-        idx = int(t * fps)
-        if idx >= len(trails):
-            return -300, -300
-        x, y = trails[int(t * fps)]
-        tweak = 100 # not sure why this is needed
-        return margin + x, margin + y - crayon_clip.size[1] - tweak
-    crayon_clip = (
-        crayon_clip
-        .with_duration(args.draw_duration)
-        .with_position(crayon_position)
-    )
-
-    # This is not ready. :)
-    #crayon_effect_clip = get_crayon_effect_clip(trails, fps=fps)
-
     base_clip = ColorClip(size=(1920, 1080), color=(255, 255, 255))
     final_clip = CompositeVideoClip([
         base_clip,
         bg_clip,
         black_clip,
         draw_clip,
-        crayon_clip,
         reveal_clip,
-        #crayon_effect_clip,
     ])
     final_clip = final_clip.with_duration(args.duration)
 
