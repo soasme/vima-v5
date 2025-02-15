@@ -1,4 +1,4 @@
-# Create a video clip for early education.
+# Create a video clip for learning words.
 # display sequence:
 # [                background               ]
 #      [ text              ][ highlight     ]
