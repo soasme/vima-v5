@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 import os
 import json
@@ -5,8 +6,12 @@ from streamlit_local_storage import LocalStorage
 from datetime import datetime
 from openai import OpenAI
 from rembg import remove as rembg
+from tempfile import NamedTemporaryFile
 import numpy as np
 from PIL import Image
+from elevenlabs.client import ElevenLabs
+from elevenlabs import save as save_voiceover
+import diskcache as dc
 
 import streamlit as st
 
@@ -312,3 +317,39 @@ def make_rembg(image):
         transparent_mask_color=(0, 0, 0, 0),
         opacity_mask_color=(0, 0, 0),
     )
+
+elevenlabs_api_key = os.environ.get('ELEVENLABS_API_KEY') or ''
+VOICES = {
+    'Brian': 'nPczCjzI2devNBz1zQrb',
+    'Whimsy': '542jzeOaLKbcpZhWfJDa',
+    'Alice': 'Xb7hH8MSUJpSbSDYk0k2',
+    'Arthur': 'TtRFBnwQdH1k01vR0hMz', # default
+}
+TTS_MODEL = 'eleven_flash_v2_5'
+cache = dc.Cache(directory='.cache')
+
+
+def make_voiceover(txt, voice='Arthur', model=TTS_MODEL):
+    """Text to speech using Eleven, then save to a file."""
+    hash = hashlib.md5(txt.encode()).hexdigest()
+    suffix = txt[:10].replace(' ', '_').replace('\n', '_').replace(',', '_').replace('.', '_').replace('?', '_').replace('!', '_')
+    cache_key = f'{voice}_{model}_{hash}_{suffix}'
+
+    if os.path.exists(f'/tmp/{cache_key}.mp3'):
+        return f'/tmp/{cache_key}.mp3'
+
+    if cache.get(cache_key):
+        with open(f'/tmp/{cache_key}.mp3', 'wb') as f:
+            f.write(cache.get(cache_key))
+        return f'/tmp/{cache_key}.mp3'
+
+    client = ElevenLabs()
+    audio = client.generate(text=txt, voice=VOICES[voice], model=TTS_MODEL)
+    with open(f'/tmp/{cache_key}.mp3', 'wb') as f:
+        save_voiceover(audio, f.name)
+
+    with open(f'/tmp/{cache_key}.mp3', 'rb') as f:
+        audio = f.read()
+        cache.set(cache_key, audio)
+
+    return f'/tmp/{cache_key}.mp3'
