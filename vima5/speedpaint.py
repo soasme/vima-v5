@@ -98,7 +98,7 @@ def speedpaint_image(image, sketching_duration, color_fill_duration, hand_style)
         progress = speedpaint_check_progress(cookies['uid'], new_file_id, token)
         if progress['status'] == 'success':
             url = progress['download_url']
-            path = f'/tmp/{new_file_id}.mp4'
+            path = image + '.mp4'
             download_url(url, path)
             return path
         if progress['status'] == 'pending':
