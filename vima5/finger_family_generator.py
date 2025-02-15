@@ -185,32 +185,6 @@ def make_finger_page(context, duration, obj, hand, finger, background, prev_back
         )
 
 
-def test_make_page():
-    args = parse_args()
-    config = {}
-    make_finger_page(
-        config,
-        3,
-        obj='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BlueTang.png',
-        hand='/Users/soasme/github.com/soasme/vima-v5/assets/Hand.png',
-        finger=0,
-        background='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BG2.png',
-        prev_background='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BG.png',
-        text='Blue Tang',
-    )
-
-    make_object_page(
-        config,
-        2,
-        obj='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BlueTang.png',
-        background='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BG.png',
-        prev_background='/Users/soasme/Downloads/LegoSeaAnimalFingerFamily/build/BG2.png',
-        text='Teacher'
-    )
-
-    render_pages('/tmp/output.mp4', fps=30, filter='1,2')
-
-
 def main():
     args = parse_args()
     with open(f'{args.input_dir}/config.json') as f:
