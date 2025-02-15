@@ -13,3 +13,6 @@ librosa
 elevenlabs
 rembg
 onnxruntime
+playwright
+diskcache
+vidgear
