@@ -21,6 +21,9 @@ Example config:
   }
 ]
 
+
+Run:
+
 $ PYTHONPATH=. python templates/fingerfamily.py --input-dir /path/to/assets --output /tmp/output.mp4
 """
 
@@ -227,3 +230,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
