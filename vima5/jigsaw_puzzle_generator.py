@@ -1,3 +1,6 @@
+# Copy from good old non-ai generated code. :)
+# Credit https://github.com/geesun/piecemaker
+
 import os
 import sys
 import argparse
@@ -440,7 +443,7 @@ def createPuzzlePieces(name,row,col,outPrefix):
     im.save(outPrefix + "outline.png");
 
 
-def split_image(image_path, rows, columns, output_dir, style='rectangle'):
+def split_image(image_path, rows, columns, output_dir, ):
     if not os.path.exists(output_dir) :
         os.makedirs(output_dir)
     
@@ -453,13 +456,11 @@ def main():
     parser.add_argument('--rows', type=int, default=4, help='Number of rows')
     parser.add_argument('--columns', type=int, default=4, help='Number of columns')
     parser.add_argument('--output', default='puzzle_pieces', help='Output directory')
-    parser.add_argument('--style', choices=['rectangle', 'jigsaw'], default='rectangle',
-                      help='Style of puzzle pieces (rectangle or jigsaw)')
     
     args = parser.parse_args()
     
     try:
-        split_image(args.image, args.rows, args.columns, args.output, args.style)
+        split_image(args.image, args.rows, args.columns, args.output)
         print(f'\nPuzzle pieces have been generated in: {args.output}')
     except Exception as e:
         print(f'Error: {str(e)}')
