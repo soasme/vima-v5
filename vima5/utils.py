@@ -334,22 +334,27 @@ def make_voiceover(txt, voice='Arthur', model=TTS_MODEL):
     hash = hashlib.md5(txt.encode()).hexdigest()
     suffix = txt[:10].replace(' ', '_').replace('\n', '_').replace(',', '_').replace('.', '_').replace('?', '_').replace('!', '_')
     cache_key = f'{voice}_{model}_{hash}_{suffix}'
+    filename = f'/tmp/{cache_key}.mp3'
 
-    if os.path.exists(f'/tmp/{cache_key}.mp3'):
-        return f'/tmp/{cache_key}.mp3'
+    if os.path.exists(filename):
+        return filename
 
     if cache.get(cache_key):
-        with open(f'/tmp/{cache_key}.mp3', 'wb') as f:
+        with open(filename, 'wb') as f:
             f.write(cache.get(cache_key))
-        return f'/tmp/{cache_key}.mp3'
+        return filename
 
     client = ElevenLabs()
     audio = client.generate(text=txt, voice=VOICES[voice], model=TTS_MODEL)
-    with open(f'/tmp/{cache_key}.mp3', 'wb') as f:
+    with open(filename, 'wb') as f:
         save_voiceover(audio, f.name)
 
-    with open(f'/tmp/{cache_key}.mp3', 'rb') as f:
+    if os.stat(filename).st_size == 0:
+        os.remove(filename)
+        raise ValueError('Voiceover is empty. Please try again.')
+
+    with open(filename, 'rb') as f:
         audio = f.read()
         cache.set(cache_key, audio)
 
-    return f'/tmp/{cache_key}.mp3'
+    return filename
