@@ -18,13 +18,14 @@
 ]
 """
 
+import os
 import numpy as np
 import math
 import json
 import argparse
 from moviepy import *
 from vima5.canva import *
-from vima5.utils import make_voiceover
+from vima5.utils import make_voiceover, get_asset_path
 from types import SimpleNamespace
 
 DEFAULT_VALUES = {
@@ -32,12 +33,23 @@ DEFAULT_VALUES = {
     'text_font': 'Arial',
     'text_voiceover_mp3': '',
     'reaction_sfx_mp3': '',
+    'reaction': '',
     'highlight': '',
     'highlight_font': 'Arial Black',
     'highlight_color': 'red',
     'highlight_voiceover_mp3': '',
     'background_mp3': '',
 }
+
+DEFAULT_SFX = {
+    'what': get_asset_path('confused-what-103562.mp3'),
+    'evil-laugh': get_asset_path('evil-laugh-288352.mp3'),
+    'giggle': get_asset_path('kids-laugh-45357.mp3'),
+    'oh-no': get_asset_path('oh-no-172892.mp3'),
+    'wow': get_asset_path('wow-121578.mp3'),
+    'amazing': get_asset_path('wow-thatx27s-amazing-girl-229854.mp3'),
+}
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Gen Game Scene')
     parser.add_argument('--config', type=str, help='Config file')
@@ -47,6 +59,7 @@ def parse_args():
     parser.add_argument('--text-delay-seconds', type=float, help='Delay N Seconds after the clip starts.', default=3.0)
     parser.add_argument('--text-font', type=str, help='Font to use', default='Arial')
     parser.add_argument('--text-voiceover-mp3', type=str, help='Voiceover MP3 file to play', default='')
+    parser.add_argument('--reaction', type=str, help='Reaction SFX to play', default='')
     parser.add_argument('--reaction-sfx-mp3', type=str, help='Reaction SFX MP3 file to play', default='')
     parser.add_argument('--highlight', type=str, help='Text to highlight, use diffrent color and bold.', default='')
     parser.add_argument('--highlight-font', type=str, help='Font to use for the highlight', default='Arial Black')
@@ -61,6 +74,7 @@ def make_page(args):
     if text_voiceover_mp3.startswith('auto:'):
         voice = text_voiceover_mp3.split(':')[1]
         text_voiceover_mp3 = make_voiceover(args.text, voice)
+        print(text_voiceover_mp3)
         text_voiceover_clip = AudioFileClip(text_voiceover_mp3)
     elif text_voiceover_mp3.endswith('.mp3'):
         text_voiceover_clip = AudioFileClip(text_voiceover_mp3)
@@ -82,7 +96,8 @@ def make_page(args):
         raise ValueError(f"Invalid highlight_voiceover_mp3: {highlight_voiceover_mp3}")
 
     # XXX: read from asset library.
-    reaction_sfx_clip = AudioFileClip(args.reaction_sfx_mp3) if args.reaction_sfx_mp3 else None
+    reaction_sfx_mp3 = DEFAULT_SFX[args.reaction] if args.reaction in DEFAULT_SFX else args.reaction_sfx_mp3
+    reaction_sfx_clip = AudioFileClip(reaction_sfx_mp3) if reaction_sfx_mp3 else None
     bg_mp3_clip = AudioFileClip(args.background_mp3) if args.background_mp3 else None
     
     text_delay_duration = args.text_delay_seconds
@@ -145,7 +160,7 @@ def make_page(args):
 
     
     if args.background.endswith('.mp4'):
-        bg_clip = VideoFileClip(args.background)
+        bg_clip = VideoFileClip(get_asset_path(args.background))
         bg_duration = min(total_duration, bg_clip.duration)
         add_elem(
             bg_clip
@@ -165,9 +180,43 @@ def make_page(args):
                 start=bg_duration,
                 duration=total_duration - bg_duration,
             )
+    elif args.background.endswith('.gif'):
+        bg_clip = VideoFileClip(get_asset_path(args.background))
+        bg_duration = total_duration
+        bg_clip = bg_clip.with_effects([
+            vfx.Resize((int(bg_clip.h/1080*1920), 1080)),
+            vfx.Loop(duration=bg_duration),
+        ])
+        add_elem(
+            bg_clip
+            .with_effects([
+                Blur(),
+            ])
+            .with_position(('left', 'center'))
+            ,
+            start=0,
+            duration=bg_duration,
+        )
+        add_elem(
+            bg_clip
+            .with_effects([
+                Blur(),
+            ])
+            .with_position(('right', 'center'))
+            ,
+            start=0,
+            duration=bg_duration,
+        )
+        add_elem(
+            bg_clip
+            .with_position(('center', 'center'))
+            ,
+            start=0,
+            duration=bg_duration,
+        )
     else:
         add_elem(
-            ImageClip(args.background)
+            ImageClip(get_asset_path(args.background))
             .with_duration(total_duration)
             .with_effects([
                 vfx.Resize((1920, 1080)),
@@ -202,6 +251,7 @@ def make_page(args):
             color='#000000',
             stroke_color='#ffffff',
             stroke_width=10,
+            margin=(100, 100),
         )
         .with_duration(highlight_duration)
         .with_position((100, 100)),
@@ -215,6 +265,8 @@ if __name__ == '__main__':
     if not args.config:
         make_page(args)
     else:
+        os.environ['ASSET_PATH'] = os.environ.get('ASSET_PATH') + ',' + os.path.dirname(args.config)
+
         with open(args.config) as f:
             config = json.loads(f.read())
         if isinstance(config, dict):
@@ -226,4 +278,4 @@ if __name__ == '__main__':
                 _config = dict(DEFAULT_VALUES)
                 _config.update(c)
                 make_page(SimpleNamespace(**_config))
-    render_pages(args.output, fps=24)
+    render_pages(args.output, fps=30)

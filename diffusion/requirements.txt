@@ -1,0 +1,8 @@
+torch
+diffusers
+accelerate
+scipy
+ftfy
+safetensors
+transformers
+numpy

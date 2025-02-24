@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image, ImageColor, ImageFilter
 from typing import Dict, List, Optional, Union
 from dataclasses import dataclass, field
+from skimage.transform import resize
 from moviepy import *
 from moviepy.Effect import Effect
 from moviepy.Clip import Clip
@@ -52,14 +53,14 @@ def add_page(name='', **kwargs):
     return page
 
 
-def anchor_center(box_top_left_x, tox_top_left_y, box_width, box_height, width, height):
+def anchor_center(box_top_left_x, box_top_left_y, box_width, box_height, width, height):
     return (
         box_top_left_x + box_width / 2 - width / 2,
-        tox_top_left_y + box_height / 2 - height / 2,
+        box_top_left_y + box_height / 2 - height / 2,
     )
 
 
-def add_elem(clip, pagenum=0, duration=0, **kwargs):
+def add_elem(clip, pagenum=0, duration=0, with_=None, **kwargs):
     if not pagenum:
         page = pages[-1]
 
@@ -105,7 +106,7 @@ def _get_page_background_clip(page, page_start_time, size):
             .with_duration(page.duration)
         )
 
-def render_pages(output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter=''):
+def render_pages(output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter='', extra_vclips=None, extra_aclips=None):
     size = RESOLUTION_MAP.get(resolution, RESOLUTION_MAP['1080p']).get(aspect_ratio, RESOLUTION_MAP['1080p']['16:9'])
 
     clips = []
@@ -130,8 +131,9 @@ def render_pages(output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1
             
         page_start_time += page.duration
 
-    final = CompositeVideoClip(video_clips)
+    final = CompositeVideoClip(video_clips + (extra_vclips if extra_vclips else []))
     if audio_clips:
+        audio_clips = audio_clips + (extra_aclips if extra_aclips else [])
         final = final.with_audio(CompositeAudioClip(audio_clips))
 
     save_mp4(final, output, fps=fps)
@@ -143,6 +145,17 @@ def render_each_page(output, *args, **kwargs):
         render_pages(filter=str(page_num), output=out, *args, **kwargs)
 
 
+@dataclass
+class Blur(Effect):
+    sigma: float = 3.0
+
+    def apply(self, clip):
+        def blur(get_frame, t):
+            frame = get_frame(t)
+            img = Image.fromarray(frame)
+            return np.array(img.filter(ImageFilter.GaussianBlur(self.sigma)))
+
+        return clip.transform(blur)
 
 @dataclass
 class FloatAnimation(Effect):
@@ -297,6 +310,179 @@ class Swing(Effect):
         return clip.transform(filter, apply_to=["mask"])
 
 
+# This implemenentation is slow.
+# Also, it shows a black bg.
+@dataclass
+class Flip(Effect):
+    duration: float
+    rotation_axis: str = 'vertical'
+
+    def apply(self, clip: Clip) -> Clip:
+        def make_frame(get_frame, t):
+            img = get_frame(t)
+            img_width, img_height = img.shape[1], img.shape[0]
+
+            # Calculate rotation angle based on time
+            angle = (t / self.duration) * 360  # Complete 360-degree rotation
+            
+            # Create transformation matrix
+            if self.rotation_axis == 'vertical':
+                # Scale factor changes based on sine of angle to simulate perspective
+                scale = abs(np.cos(np.radians(angle)))
+                new_width = int(img_width * scale)
+                if new_width < 1:  # Prevent width from becoming 0
+                    new_width = 1
+                
+                # Resize image based on perspective
+                frame = resize(img, (img_height, new_width), anti_aliasing=True)
+                
+                # Create background
+                background = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+                
+                # Calculate position to paste the resized image
+                x_offset = (img_width - new_width) // 2
+                background[:, x_offset:x_offset + new_width] = frame
+                
+            else:  # horizontal rotation
+                # Scale factor changes based on sine of angle to simulate perspective
+                scale = abs(np.cos(np.radians(angle)))
+                new_height = int(img_height * scale)
+                if new_height < 1:  # Prevent height from becoming 0
+                    new_height = 1
+                
+                # Resize image based on perspective
+                frame = resize(img, (img_width, new_height), anti_aliasing=True)
+                
+                # Create background
+                background = np.zeros((img_height, img_width, 3), dtype=np.uint8)
+                
+                # Calculate position to paste the resized image
+                y_offset = (img_height - new_height) // 2
+                background[y_offset:y_offset + new_height, :] = frame
+            
+            return background
+        return clip.transform(make_frame)
+
+@dataclass
+class UniformMotion(Effect):
+    from_position: tuple
+    to_position: tuple
+
+    def apply(self, clip):
+        def newpos(t):
+            x = int(self.from_position[0] + (self.to_position[0] - self.from_position[0]) * t/clip.duration)
+            y = int(self.from_position[1] + (self.to_position[1] - self.from_position[1]) * t/clip.duration)
+            return x, y
+        return clip.with_position(newpos)
+
+@dataclass
+class UniformScale(Effect):
+    from_scale: float
+    to_scale: float
+
+    def apply(self, clip):
+        def get_size(t):
+            return self.from_scale + (self.to_scale - self.from_scale) * t/clip.duration
+        return clip.resized(get_size)
+
+# Buggy implementation, not working.
+class Spring(Effect):
+    """
+    Effect that simulates spring physics to move a clip from one position to another.
+    The clip will bounce around the target position before settling.
+    
+    Parameters:
+    -----------
+    from_position : tuple (x,y), optional
+        Initial position
+    to_position : tuple (x,y), optional
+        Target position
+    stiffness : float, optional
+        Spring stiffness coefficient (higher = stronger spring)
+    damping : float, optional
+        Damping factor (higher = more damping, less oscillation)
+    mass : float, optional
+        Mass of the object (higher = more inertia)
+    fps : int, optional
+        Frames per second for physics calculation. Higher values give more accurate simulation.
+    initial_velocity : tuple (vx, vy), optional
+        Initial velocity of the clip
+    """
+    
+    def __init__(self, from_position=(0,0), to_position=(0,0), 
+                 stiffness=5.0, damping=0.5, mass=1.0, fps=24, 
+                 initial_velocity=(0,0)):
+        # Store parameters
+        self.from_position = np.array(from_position, dtype=float)
+        self.to_position = np.array(to_position, dtype=float)
+        self.stiffness = stiffness
+        self.damping = damping
+        self.mass = mass
+        self.fps = fps
+        self.initial_velocity = np.array(initial_velocity, dtype=float)
+         
+    def _calculate_positions(self, clip):
+        """Calculate all positions for the spring physics simulation"""
+        # Initialize physics parameters
+        pos = self.from_position.copy()
+        vel = self.initial_velocity.copy()
+        dt = 1.0 / self.fps
+        
+        # Pre-calculate all positions for smoothness
+        t = np.arange(0, clip.duration, dt)
+        positions = []
+        
+        # Run physics simulation
+        for _ in t:
+            # Spring force (Hooke's law): F = -k * (pos - equilibrium)
+            spring_force = self.stiffness * (self.to_position - pos)
+            
+            # Damping force: F = -c * velocity
+            damping_force = -self.damping * vel
+            
+            # Total force
+            force = spring_force + damping_force
+            
+            # Acceleration (F = ma)
+            acc = force / self.mass
+            
+            # Update velocity and position (Euler integration)
+            vel = vel + acc * dt
+            pos = pos + vel * dt
+            
+            positions.append(pos.copy())
+        
+        return np.array(positions)
+    
+ 
+    def apply(self, clip):
+        """Apply the effect at time t (required by the Effect class)"""
+        # This method doesn't need to do any transformation since we're using 
+        # the with_position method in make_frame below
+        # The frame transformation happens via the clip's position
+
+        positions = self._calculate_positions(clip)
+
+        def get_position(t):
+            """Get the position at time t"""
+            if t >= clip.duration:
+                return tuple(self.to_position)
+        
+            idx = min(int(t * self.fps), len(positions) - 1)
+            x = min(0, max(1920, positions[idx][0]))
+            y = min(0, max(1080, positions[idx][1]))
+            return int(x), int(y)
+
+        return clip.with_position(get_position)
+    
+
+# Create a convenience function for moviepy's standard fx interface
+def spring(clip, from_position=(0,0), to_position=(0,0), stiffness=5.0, 
+           damping=0.5, mass=1.0, fps=None, initial_velocity=(0,0)):
+    """Applies spring effect to the clip"""
+    return Spring(clip, from_position, to_position, stiffness, 
+                 damping, mass, fps, initial_velocity)
+
 def paste_non_transparent(image_a, image_b, position=(0, 0)):
     """
     Pastes the non-transparent pixels of image_a onto image_b.
@@ -327,3 +513,4 @@ def paste_non_transparent(image_a, image_b, position=(0, 0)):
 
                 if 0 <= x_b < image_b.width and 0 <= y_b < image_b.height:  # Check bounds
                     image_b.putpixel((x_b, y_b), (r, g, b, a))
+

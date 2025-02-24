@@ -27,6 +27,7 @@ Run:
 $ PYTHONPATH=. python templates/fingerfamily.py --input-dir /path/to/assets --output /tmp/output.mp4
 """
 
+import os
 import numpy as np
 import math
 import json
@@ -42,30 +43,58 @@ DEFAULT_CONFIG = {
 
 CANVA_WIDTH = 1920
 CANVA_HEIGHT = 1080
-HAND_ANCHORS = [
+
+HAND_POS = {
+    'PlushHand.png': (346, 170),
+    'LegoHand.png': (346, 170),
+    'VectorHand.png': (108, 55),
+}
+
+HAND_ANCHORS = {
+    'LegoHand.png': [
         (335,477),
         (474,210),
         (610,149),
         (749,215),
         (919,418),
-]
+    ],
+    'PlushHand.png': [
+        (471,405),
+        (593,145),
+        (745,94),
+        (890,133),
+        (998,263),
+    ],
+    'VectorHand.png': [
+        (1234,591),
+        (1028,215),
+        (805,169),
+        (593,243),
+        (453,413),
+    ],
+}
+
+HAND_CENTERS = {
+    'LegoHand.png': (981, 1044),
+    'PlushHand.png': (981, 1044),
+    'VectorHand.png': (960, 1648),
+}
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Finger Family')
     parser.add_argument('--input-dir', type=str, help='Input Directory having all the images and config')
     parser.add_argument('--output', type=str, help='Output video file', default='/tmp/output.mp4')
+    parser.add_argument('--compile', action='store_true', help='Compile the video')
 
     args = parser.parse_args()
     return args
 
 
-def make_object_page(context, duration, obj, background,  prev_background=None, text=''):
+def make_object_page(context, duration, obj, background,  prev_background=None, text='', bg_slide_in=0.0):
     add_page(
         duration=duration,
         background='#ffffff',
     )
-
-    bg_slide_in = 0.5
 
     # XXX: This should be a subclip of last bg_slide_in seconds of the previous page.
     if prev_background:
@@ -76,12 +105,13 @@ def make_object_page(context, duration, obj, background,  prev_background=None, 
             ])
         )
 
+    bg_effects = [vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT))]
+    if prev_background and bg_slide_in:
+        bg_effects.append(vfx.SlideIn(bg_slide_in, side='right'))
+
     add_elem(
         ImageClip(background)
-        .with_effects([
-            vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT)),
-            vfx.SlideIn(bg_slide_in, side='right'),
-        ])
+        .with_effects(bg_effects)
     )
 
     obj_clip = ImageClip(obj).with_effects([
@@ -124,13 +154,11 @@ def make_object_page(context, duration, obj, background,  prev_background=None, 
 
 
 
-def make_finger_page(context, duration, obj, hand, finger, background, prev_background=None, text=''):
+def make_finger_page(context, duration, obj, hand, finger, background, prev_background=None, text='', bg_slide_in=0.0):
     add_page(
         duration=duration,
         background='#ffffff',
     )
-
-    bg_slide_in = 0.5
 
     if prev_background:
         add_elem(
@@ -140,32 +168,35 @@ def make_finger_page(context, duration, obj, hand, finger, background, prev_back
             ])
         )
 
+    bg_effects = [vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT))]
+    if prev_background and bg_slide_in:
+        bg_effects.append(vfx.SlideIn(bg_slide_in, side='right'))
+
     add_elem(
         ImageClip(background)
-        .with_effects([
-            vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT)),
-            vfx.SlideIn(bg_slide_in, side='right'),
-        ])
+        .with_effects(bg_effects)
     )
 
+    hand_anchor = HAND_ANCHORS[os.path.basename(hand)][finger]
+    hand_pos = HAND_POS[os.path.basename(hand)]
+    hand_center = HAND_CENTERS[os.path.basename(hand)]
     hand = Image.open(hand)
     obj = Image.open(obj)
     obj = obj.resize((int(obj.width * 0.3), int(obj.height * 0.3)))
-    hand_anchor = HAND_ANCHORS[finger]
     point = (
         int(hand_anchor[0] - obj.size[0]/2),
         int(hand_anchor[1] - obj.size[1]/2),
     )
     paste_non_transparent(obj, hand, point)
     hand_clip = ImageClip(np.array(hand))
-    hand_clip = hand_clip.with_position(( 346, 170 ))
+    hand_clip = hand_clip.with_position(hand_pos)
     add_elem(
         hand_clip.with_effects([
             Swing(
-                start_angle=-15,
-                end_angle=15,
+                start_angle=-5,
+                end_angle=5,
                 period=1,
-                center=(981, 1044),
+                center=hand_center,
             )
         ])
     )
@@ -197,11 +228,13 @@ def main():
         pages = json.load(f)
     config = {}
     for index, page in enumerate(pages):
+        obj = page.get('object')
+        bg = page.get('background')
         if page['type'] == 'object':
             make_object_page(
                 config,
                 page['duration'],
-                obj=f"{args.input_dir}/{page['object']}",
+                obj=f"{args.input_dir}/{obj}",
                 background=f"{args.input_dir}/{page['background']}",
                 prev_background=(
                     f"{args.input_dir}/{page.get('prev_background')}"
@@ -214,8 +247,8 @@ def main():
             make_finger_page(
                 config,
                 page['duration'],
-                obj=f"{args.input_dir}/{page['object']}",
-                hand=get_asset_path('Hand.png'),
+                obj=f"{args.input_dir}/{obj}",
+                hand=get_asset_path(page.get('hand', 'LegoHand.png')),
                 finger=page['finger'],
                 background=f"{args.input_dir}/{page['background']}",
                 prev_background=(
@@ -226,7 +259,10 @@ def main():
                 ),
                 text=page.get('text', ''),
             )
-    render_each_page(args.output, fps=30)
+    if args.compile:
+        render_pages(args.output, fps=30)
+    else:
+        render_each_page(args.output, fps=30)
 
 if __name__ == '__main__':
     main()

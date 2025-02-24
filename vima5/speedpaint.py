@@ -136,11 +136,28 @@ if __name__ == '__main__':
     parser.add_argument('--color-fill-duration', type=int, default=5)
     parser.add_argument('--hand-style', type=str, default='1')
     args = parser.parse_args()
-    path = speedpaint_image(
-        args.image,
-        args.sketching_duration,
-        args.color_fill_duration,
-        args.hand_style,
-    )
 
-    print(path)
+    if os.path.isdir(args.image):
+        for image in os.listdir(args.image):
+            if not image.endswith('.png'):
+                print('skip', image)
+                continue
+            if image+'.mp4' in os.listdir(args.image):
+                print('skip', image)
+                continue
+            print('processing', image)
+            path = speedpaint_image(
+                os.path.join(args.image, image),
+                args.sketching_duration,
+                args.color_fill_duration,
+                args.hand_style,
+            )
+            print(path)
+    else:
+        path = speedpaint_image(
+            args.image,
+            args.sketching_duration,
+            args.color_fill_duration,
+            args.hand_style,
+        )
+        print(path)
