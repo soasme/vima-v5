@@ -27,7 +27,11 @@ import argparse
 from PIL import Image, ImageOps, ImageFilter
 from moviepy import *
 from vima5.canva import *
+from rembg import remove as rembg
+
+from vima5.utils import mask_alpha
 from vima5.utils import make_voiceover, get_asset_path
+from vima5.randomplace import distribute_images
 from types import SimpleNamespace
 
 CANVA_WIDTH = 1920
@@ -184,11 +188,60 @@ def make_page(config, idx):
         duration=voiceover_clip.duration,
     )
 
+def generate_config(args, config):
+    files = sorted(os.listdir(args.input_dir))
+    files = [f for f in files if f.endswith('.png')]
+    data = {}
+    for file in files:
+        if 'background' in file.lower():
+            data['background'] = file
+            continue
+        if 'animals' not in data:
+            data['animals'] = []
+        data['animals'].append({
+            'id': os.path.basename(file).replace('.png', '')[:2],
+            'name': os.path.basename(file).replace('.png', '')[3:].title(),
+            'file': file,
+            'pos': [0, 0],
+            'size': [0, 0],
+        })
+    data['animals'].sort(key=lambda x: int(x['id']))
+    images = [f['file'] for f in data['animals']]
+    placements, coverage = distribute_images(CANVA_WIDTH, CANVA_HEIGHT, len(images))
+    for i, animal in enumerate(data['animals']):
+        animal['pos'] = placements[i][0], placements[i][1]
+        image = Image.open(args.input_dir + '/' + animal['file'])
+        size = image.size
+        scale = placements[i][2]
+        animal['size'] = size[0] * scale, size[1] * scale
+
+        rembg_path = args.input_dir + '/build/' + animal['file']
+        black_path = args.input_dir + '/build/' + animal['file'].replace('.png', '_black.png')
+
+        if not os.path.exists(rembg_path):
+            image = Image.open(datadir + '/' + file).convert("RGBA")
+            rembg_image = rembg(image, model='isnet-anime')
+            rembg_image.save(rembg_path)
+
+        mask_alpha(rembg_path, black_path,
+            translucency_mask_color=(0, 0, 0),
+            transparent_mask_color=(0, 0, 0, 0),
+            opacity_mask_color=(0, 0, 0),
+        )
+
+
+    with open(config, 'w') as f:
+        json.dump(data, f, indent=2)
+        print('Config file generated at', config)
 
 def main():
-
     args = parse_args()
-    with open(f'{args.input_dir}/config.json') as f:
+    config = f'{args.input_dir}/config.json'
+    if not os.path.exists(config):
+        print('Config file not found, generating one')
+        generate_config(args, config)
+
+    with open(config) as f:
         config = json.load(f)
 
     config['input_dir'] = args.input_dir
