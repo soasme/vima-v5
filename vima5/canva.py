@@ -4,7 +4,7 @@
 import math
 import numpy as np
 from PIL import Image, ImageColor, ImageFilter
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
 from skimage.transform import resize
 from moviepy import *
@@ -160,17 +160,18 @@ class Blur(Effect):
 @dataclass
 class FloatAnimation(Effect):
     axis: str = 'y'
+    scale: float = 10.0
 
     def apply(self, clip):
         if self.axis == 'x':
             return clip.with_position(lambda t: (
-                clip.pos(t)[0] - 10 * math.sin(3 * t),
+                clip.pos(t)[0] - self.scale * math.sin(3 * t),
                 clip.pos(t)[1]
             ))
         elif self.axis == 'y':
             return clip.with_position(lambda t: (
                 clip.pos(t)[0],
-                clip.pos(t)[1] - 10 * math.sin(3 * t)
+                clip.pos(t)[1] - self.scale * math.sin(3 * t)
             ))
         else:
             raise ValueError(f"Invalid axis: {self.axis}")
@@ -384,6 +385,30 @@ class UniformScale(Effect):
         def get_size(t):
             return self.from_scale + (self.to_scale - self.from_scale) * t/clip.duration
         return clip.resized(get_size)
+
+@dataclass
+class RemoveColor(Effect):
+    color: Tuple[int, int, int]
+
+    def apply(self, clip):
+        def transform(frame):
+            frame = np.array(frame, copy=True)
+            mask = np.all(frame[..., :3] == np.array(self.color[:3]), axis=-1)
+            if frame.shape[-1] == 3:
+                alpha = np.ones(frame.shape[:2], dtype=np.uint8) * 255
+                frame = np.dstack((frame, alpha))
+
+            frame[mask, 3] = 0  # Set alpha to 0 where mask is True
+            return frame.astype(np.uint8)
+
+            #mask = np.all(frame == np.array(self.color), axis=-1)
+            #frame = frame.astype(np.uint8) * ~mask[:, :, None]
+            #frame[mask, 3] = 0
+            #frame = np.dstack((frame, (~mask * 255).astype(np.uint8)))
+            #mask = np.all(frame == self.color, axis=-1)
+            #frame[mask] = [0, 0, 0, 0]
+            return frame
+        return clip.image_transform(transform)
 
 # Buggy implementation, not working.
 class Spring(Effect):
