@@ -24,3 +24,5 @@ flask-cors
 yt-dlp
 pyperclip
 cairosvg
+panda3d
+panda3d-gltf

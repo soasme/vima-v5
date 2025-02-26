@@ -65,6 +65,7 @@ class ModelToGif(ShowBase):
         
         # Create a temporary directory to store frames
         self.temp_dir = tempfile.mkdtemp()
+        print(self.temp_dir)
         
         # Disable mouse control
         self.disableMouse()
