@@ -249,7 +249,10 @@ def main():
     for i in range(len(config['animals'])):
         make_page(config, i)
 
-    render_pages('/tmp/output.mp4', fps=FPS)
+    if args.compile:
+        render_pages(args.output, fps=FPS)
+    else:
+        render_each_page(args.output, fps=FPS)
 
 if __name__ == '__main__':
     main()
