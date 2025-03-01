@@ -3,6 +3,7 @@
 
 import math
 import numpy as np
+from contextlib import contextmanager
 from PIL import Image, ImageColor, ImageFilter
 from typing import Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ class Element:
 
 @dataclass
 class Page:
+    movie: 'Movie' = None
     num: int = 1
     name: str = ''
     color: str = 'white'
@@ -38,47 +40,90 @@ class Page:
     animate_config: Dict = field(default_factory=dict)
     elements: List[Element] = field(default_factory=list)
 
+    def elem(self, clip, pagenum=0, duration=0, with_=None, **kwargs):
+        if not pagenum:
+            page = self.movie.current_page
+    
+        if duration != 0:
+            kwargs['end'] = kwargs['start'] + duration
+    
+        elem = Element(page=page, **kwargs)
+        elem.clip = clip
+        page.elements.append(elem)
+        return elem
 
-pages = []
+@dataclass
+class Movie:
+    title: str = ''
+    pages: List[Page] = field(default_factory=list)
 
+
+    @contextmanager
+    def page(self, name='', **kwargs):
+        num = len(self.pages) + 1
+        page = Page(
+            movie=self,
+            num=num,
+            name=f'Page {num}' if not name else name,
+            **kwargs
+        )
+        self.pages.append(page)
+        yield page
+
+    @property
+    def current_page(self):
+        if not self.pages:
+            return None
+        return self.pages[-1]
+
+    def render(self, output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter='', extra_vclips=None, extra_aclips=None):
+        size = RESOLUTION_MAP.get(resolution, RESOLUTION_MAP['1080p']).get(aspect_ratio, RESOLUTION_MAP['1080p']['16:9'])
+    
+        clips = []
+    
+        filter = [int(f) for f in filter.split(',') if f]
+    
+        # Set start/end for each clip
+        page_start_time = 0.0
+        video_clips, audio_clips = [], []
+        for page in self.pages:
+            if filter and page.num not in filter:
+                continue
+            video_clips.append(_get_page_background_clip(page, page_start_time, size))
+            for elem in page.elements:
+                clip = elem.clip
+                clip = clip.with_start(page_start_time + elem.start)
+                clip = clip.with_end(page_start_time + (elem.end if elem.end else page.duration))
+                if isinstance(clip, (AudioFileClip, CompositeAudioClip)):
+                    audio_clips.append(clip)
+                else:
+                    video_clips.append(clip)
+                
+            page_start_time += page.duration
+    
+        final = CompositeVideoClip(video_clips + (extra_vclips if extra_vclips else []))
+        if audio_clips:
+            audio_clips = audio_clips + (extra_aclips if extra_aclips else [])
+            final = final.with_audio(CompositeAudioClip(audio_clips))
+    
+        save_mp4(final, output, fps=fps)
+
+    def render_each_page(self, output, *args, **kwargs):
+        for page_num in range(1, len(self.pages) + 1):
+            out = output.replace('.mp4', f'-{page_num}.mp4')
+            self.render(filter=str(page_num), output=out, *args, **kwargs)
+
+movie = Movie('Untitled Movie')
 
 def add_page(name='', **kwargs):
-    num = len(pages) + 1
-    page = Page(
-        num=num,
-        name=f'Page {num}' if not name else name,
-        **kwargs
-    )
-    pages.append(page)
-    return page
-
-
-def anchor_center(box_top_left_x, box_top_left_y, box_width, box_height, width, height):
-    return (
-        box_top_left_x + box_width / 2 - width / 2,
-        box_top_left_y + box_height / 2 - height / 2,
-    )
-
-
-def add_elem(clip, pagenum=0, duration=0, with_=None, **kwargs):
-    if not pagenum:
-        page = pages[-1]
-
-    if duration != 0:
-        kwargs['end'] = kwargs['start'] + duration
-
-    elem = Element(page=page, **kwargs)
-    elem.clip = clip
-    page.elements.append(elem)
-    return elem
+    with movie.page(name=name, **kwargs) as page:
+        return page
 
 def current_page():
-    return pages[-1]
+    return movie.current_page
 
-
-def get_page_config(pagenum):
-    return next(page for page in pages if page.num == pagenum)
-
+def add_elem(clip, pagenum=0, duration=0, with_=None, **kwargs):
+    return page.elem(clip, pagenum=pagenum, duration=duration, with_=with_, **kwargs)
 
 def _get_page_background_clip(page, page_start_time, size):
     if '.png' in page.background or '.jpg' in page.background:
@@ -107,43 +152,10 @@ def _get_page_background_clip(page, page_start_time, size):
         )
 
 def render_pages(output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter='', extra_vclips=None, extra_aclips=None):
-    size = RESOLUTION_MAP.get(resolution, RESOLUTION_MAP['1080p']).get(aspect_ratio, RESOLUTION_MAP['1080p']['16:9'])
-
-    clips = []
-
-    filter = [int(f) for f in filter.split(',') if f]
-
-    # Set start/end for each clip
-    page_start_time = 0.0
-    video_clips, audio_clips = [], []
-    for page in pages:
-        if filter and page.num not in filter:
-            continue
-        video_clips.append(_get_page_background_clip(page, page_start_time, size))
-        for elem in page.elements:
-            clip = elem.clip
-            clip = clip.with_start(page_start_time + elem.start)
-            clip = clip.with_end(page_start_time + (elem.end if elem.end else page.duration))
-            if isinstance(clip, (AudioFileClip, CompositeAudioClip)):
-                audio_clips.append(clip)
-            else:
-                video_clips.append(clip)
-            
-        page_start_time += page.duration
-
-    final = CompositeVideoClip(video_clips + (extra_vclips if extra_vclips else []))
-    if audio_clips:
-        audio_clips = audio_clips + (extra_aclips if extra_aclips else [])
-        final = final.with_audio(CompositeAudioClip(audio_clips))
-
-    save_mp4(final, output, fps=fps)
-
+    return movie.render(output=output, aspect_ratio=aspect_ratio, fps=fps, resolution=resolution, filter=filter, extra_vclips=extra_vclips, extra_aclips=extra_aclips)
 
 def render_each_page(output, *args, **kwargs):
-    for page_num in range(1, len(pages) + 1):
-        out = output.replace('.mp4', f'-{page_num}.mp4')
-        render_pages(filter=str(page_num), output=out, *args, **kwargs)
-
+    return movie.render_each_page(output, *args, **kwargs)
 
 @dataclass
 class Blur(Effect):
@@ -365,6 +377,33 @@ class Flip(Effect):
         return clip.transform(make_frame)
 
 @dataclass
+class SquishBounceEffect(Effect):
+
+    #:param frequency: How fast the bouncing occurs (Hz, cycles per second)
+    frequency: float = 2
+
+    #:param amplitude: Maximum stretch/squish factor by unit vector.
+    amplitude: float = 10
+
+    def apply(self, clip):
+        w, h = clip.size
+        def resize(t):
+            new_w = int(w + 10 * np.sin(2 * np.pi * self.frequency * t))
+            new_h = int(h + 10 * np.cos(2 * np.pi * self.frequency * t))
+            return (new_w, new_h)
+        # fix the left bottom corner
+        def newpos(t):
+            x, y = clip.pos(t)
+            new_w = int(w + 10 * np.sin(2 * np.pi * self.frequency * t))
+            new_h = int(h + 10 * np.cos(2 * np.pi * self.frequency * t))
+            delta_w = new_w - w
+            delta_h = new_h - h
+            return x - delta_w, y - delta_h
+        return clip.with_effects([
+            vfx.Resize(resize),
+        ]).with_position(newpos)
+
+@dataclass
 class UniformMotion(Effect):
     from_position: tuple
     to_position: tuple
@@ -385,6 +424,8 @@ class UniformScale(Effect):
         def get_size(t):
             return self.from_scale + (self.to_scale - self.from_scale) * t/clip.duration
         return clip.resized(get_size)
+
+
 
 @dataclass
 class RemoveColor(Effect):
@@ -538,4 +579,11 @@ def paste_non_transparent(image_a, image_b, position=(0, 0)):
 
                 if 0 <= x_b < image_b.width and 0 <= y_b < image_b.height:  # Check bounds
                     image_b.putpixel((x_b, y_b), (r, g, b, a))
+
+
+def anchor_center(box_top_left_x, box_top_left_y, box_width, box_height, width, height):
+    return (
+        box_top_left_x + box_width / 2 - width / 2,
+        box_top_left_y + box_height / 2 - height / 2,
+    )
 
