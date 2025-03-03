@@ -28,16 +28,146 @@ from PIL import Image, ImageOps, ImageFilter
 from moviepy import *
 from vima5.canva import *
 from rembg import remove as rembg
+import random
+from typing import List, Tuple, Optional
 
 from vima5.utils import mask_alpha
 from vima5.utils import make_voiceover, get_asset_path
-from vima5.randomplace import distribute_images
 from types import SimpleNamespace
 
 CANVA_WIDTH = 1920
 CANVA_HEIGHT = 1080
 #FPS = 12
 FPS = 30
+
+def find_top_y(image, start_x, end_x):
+    """
+    Finds the topmost y coordinate with non-zero alpha within a given x range in a PIL Image.
+  
+    Args:
+      image: A PIL Image object.
+      start_x: The starting x coordinate.
+      end_x: The ending x coordinate.
+  
+    Returns:
+      The topmost y coordinate with non-zero alpha, or None if no such pixel is found.
+    """
+    width, height = image.size
+    for y in range(height):
+        for x in range(start_x, end_x + 1):
+            r, g, b, a = image.getpixel((x, y))
+            if a != 0:
+                return y
+    return 0 # Defaults to top, if no non-zero alpha pixel found
+
+def find_bottom_y(image, start_x, end_x):
+    """
+    Finds the bottommost y coordinate with non-zero alpha within a given x range in a PIL Image.
+    
+    Args:
+        image: A PIL Image object.
+        start_x: The starting x coordinate.
+        end_x: The ending x coordinate.
+    
+    Returns:
+        The bottommost y coordinate with non-zero alpha, or None if no such pixel is found.
+    """
+    width, height = image.size
+    for y in range(height - 1, -1, -1):
+        for x in range(start_x, end_x + 1):
+            r, g, b, a = image.getpixel((x, y))
+            if a != 0:
+                return y
+    return height - 1  # Defaults to bottom, if no non-zero alpha pixel found
+
+def find_left_x(image, start_y, end_y):
+    """
+    Finds the leftmost x coordinate with non-zero alpha within a given y range in a PIL Image.
+    
+    Args:
+        image: A PIL Image object.
+        start_y: The starting y coordinate.
+        end_y: The ending y coordinate.
+    
+    Returns:
+        The leftmost x coordinate with non-zero alpha, or None if no such pixel is found.
+    """
+    width, height = image.size
+    for x in range(width):
+        for y in range(start_y, end_y + 1):
+            r, g, b, a = image.getpixel((x, y))
+            if a != 0:
+                return x
+    return 0  # Defaults to left, if no non-zero alpha pixel found
+
+def find_right_x(image, start_y, end_y):
+    """
+    Finds the rightmost x coordinate with non-zero alpha within a given y range in a PIL Image.
+    
+    Args:
+        image: A PIL Image object.
+        start_y: The starting y coordinate.
+        end_y: The ending y coordinate.
+    
+    Returns:
+        The rightmost x coordinate with non-zero alpha, or None if no such pixel is found.
+    """
+    width, height = image.size
+    for x in range(width - 1, -1, -1):
+        for y in range(start_y, end_y + 1):
+            r, g, b, a = image.getpixel((x, y))
+            if a != 0:
+                return x
+    return width - 1  # Defaults to right, if no non-zero alpha pixel found
+
+def find_nontransparent_box(image):
+    """
+    Finds the bounding box of non-transparent pixels in a PIL Image.
+    
+    Args:
+        image: A PIL Image object.
+    
+    Returns:
+        A tuple (x, y, width, height) of the bounding box.
+    """
+    width, height = image.size
+    left = find_left_x(image, 0, height - 1)
+    right = find_right_x(image, 0, height - 1)
+    top = find_top_y(image, left, right)
+    bottom = find_bottom_y(image, left, right)
+    return (left, top, right - left + 1, bottom - top + 1)
+
+def distribute_images(
+    images: List[Image.Image],
+    canvas_size: Tuple[int, int] = (1920, 1080),
+    cols: int = 5,
+    rows: int = 3,
+) -> List[Tuple[float, int, int, int, int]]:
+    grid_height = canvas_size[1] // rows
+    grid_width = canvas_size[0] // cols
+    placements = []
+
+    margin = (50, 50)
+    for i, img in enumerate(images):
+        img = img.convert('RGBA')
+        box = find_nontransparent_box(img)
+        box = (
+            max(0, box[0] - margin[0]),
+            max(0, box[1] - margin[1]),
+            box[2] + 2 * margin[0],
+            box[3] + 2 * margin[1],
+        )
+        if box[2] > grid_width or box[3] > grid_height:
+            scale = min(grid_width / box[2], grid_height / box[3])
+        else:
+            scale = 1.0
+        placements.append((
+            grid_width * (i % cols),
+            grid_height * (i // cols),
+            scale,
+        ))
+
+    return placements
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Finger Family')
@@ -207,27 +337,30 @@ def generate_config(args, config):
         })
     data['animals'].sort(key=lambda x: int(x['id']))
     images = [f['file'] for f in data['animals']]
-    placements, coverage = distribute_images(CANVA_WIDTH, CANVA_HEIGHT, len(images))
+    placements = distribute_images([
+        Image.open(args.input_dir + '/' + f) for f in images
+    ], [CANVA_WIDTH, CANVA_HEIGHT])
+    print(placements)
     for i, animal in enumerate(data['animals']):
-        animal['pos'] = placements[i][0], placements[i][1]
+        x, y, scale = placements[i]
+        animal['scale'] = scale
+        animal['pos'] = x, y
         image = Image.open(args.input_dir + '/' + animal['file'])
-        size = image.size
-        scale = placements[i][2]
-        animal['size'] = size[0] * scale, size[1] * scale
+        animal['size'] = image.size[0] * scale, image.size[1] * scale
 
         rembg_path = args.input_dir + '/build/' + animal['file']
         black_path = args.input_dir + '/build/' + animal['file'].replace('.png', '_black.png')
 
         if not os.path.exists(rembg_path):
-            image = Image.open(datadir + '/' + file).convert("RGBA")
             rembg_image = rembg(image, model='isnet-anime')
             rembg_image.save(rembg_path)
 
-        mask_alpha(rembg_path, black_path,
-            translucency_mask_color=(0, 0, 0),
-            transparent_mask_color=(0, 0, 0, 0),
-            opacity_mask_color=(0, 0, 0),
-        )
+        if not os.path.exists(black_path):
+            mask_alpha(rembg_path, black_path,
+                translucency_mask_color=(0, 0, 0),
+                transparent_mask_color=(0, 0, 0, 0),
+                opacity_mask_color=(0, 0, 0),
+            )
 
 
     with open(config, 'w') as f:

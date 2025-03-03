@@ -226,6 +226,9 @@ def main():
     args = parse_args()
     with open(f'{args.input_dir}/config.json') as f:
         pages = json.load(f)
+
+    os.environ['ASSET_PATH'] = args.input_dir + ',' + os.environ.get('ASSET_PATH', '')
+
     config = {}
     for index, page in enumerate(pages):
         obj = page.get('object')
@@ -248,7 +251,7 @@ def main():
                 config,
                 page['duration'],
                 obj=f"{args.input_dir}/{obj}",
-                hand=get_asset_path(page.get('hand', 'LegoHand.png')),
+                hand=get_asset_path(page.get('hand', 'VectorHand.png')),
                 finger=page['finger'],
                 background=f"{args.input_dir}/{page['background']}",
                 prev_background=(
