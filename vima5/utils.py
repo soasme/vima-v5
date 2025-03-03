@@ -220,7 +220,12 @@ def get_build_path(path):
     return Path('.') / 'build' / path
 
 def save_mp4(clip, path, fps=24):
-    clip.write_videofile(path, fps=fps, codec="libx264", temp_audiofile="temp-audio.m4a", remove_temp=True, audio_codec="aac", threads=4)
+    with NamedTemporaryFile(suffix='.m4a') as f:
+        clip.write_videofile(path, fps=fps, codec="libx264",
+                             temp_audiofile=f.name,
+                             remove_temp=True,
+                             audio_codec="aac",
+                             threads=4)
 
 def blacken_image(image):
   """
@@ -323,6 +328,11 @@ VOICES = {
     'Brian': 'nPczCjzI2devNBz1zQrb',
     'Whimsy': '542jzeOaLKbcpZhWfJDa',
     'Alice': 'Xb7hH8MSUJpSbSDYk0k2',
+    'Bella': 'jF58wCtan46ecp8biibj',
+    'Jessica': 'lxYfHSkYm1EzQzGhdbfc',
+    'Bill': 'pqHfZKP75CvOlQylNhV4',
+    'Lily': 'pFZP5JQG7iQjIQuC4Bku',
+    'Daniel': 'onwK4e9ZLuTAKqWW03F9',
     'Arthur': 'TtRFBnwQdH1k01vR0hMz', # default
 }
 TTS_MODEL = 'eleven_flash_v2_5'

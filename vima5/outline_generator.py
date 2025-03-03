@@ -26,11 +26,12 @@ def main():
             rembg_image = rembg(image)
             rembg_image.save(rembg_path)
 
-        mask_alpha(rembg_path, black_path,
-            translucency_mask_color=(0, 0, 0),
-            transparent_mask_color=(0, 0, 0, 0),
-            opacity_mask_color=(0, 0, 0),
-        )
+        if not os.path.exists(black_path):
+            mask_alpha(rembg_path, black_path,
+                translucency_mask_color=(0, 0, 0),
+                transparent_mask_color=(0, 0, 0, 0),
+                opacity_mask_color=(0, 0, 0),
+            )
 
 
 if __name__ == '__main__':

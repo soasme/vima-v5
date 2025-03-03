@@ -76,7 +76,7 @@ class Movie:
             return None
         return self.pages[-1]
 
-    def render(self, output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter='', extra_vclips=None, extra_aclips=None):
+    def render(self, output='output.mp4', aspect_ratio='16:9', fps=30, resolution='1080p', filter='', extra_vclips=None, extra_aclips=None, upscaler=1):
         size = RESOLUTION_MAP.get(resolution, RESOLUTION_MAP['1080p']).get(aspect_ratio, RESOLUTION_MAP['1080p']['16:9'])
     
         clips = []
@@ -102,6 +102,10 @@ class Movie:
             page_start_time += page.duration
     
         final = CompositeVideoClip(video_clips + (extra_vclips if extra_vclips else []))
+
+        if upscaler != 1:
+            final = final.resized(upscaler)
+
         if audio_clips:
             audio_clips = audio_clips + (extra_aclips if extra_aclips else [])
             final = final.with_audio(CompositeAudioClip(audio_clips))
@@ -123,6 +127,7 @@ def current_page():
     return movie.current_page
 
 def add_elem(clip, pagenum=0, duration=0, with_=None, **kwargs):
+    page = current_page()
     return page.elem(clip, pagenum=pagenum, duration=duration, with_=with_, **kwargs)
 
 def _get_page_background_clip(page, page_start_time, size):
@@ -419,10 +424,14 @@ class UniformMotion(Effect):
 class UniformScale(Effect):
     from_scale: float
     to_scale: float
+    duration: float = 0.0
 
     def apply(self, clip):
         def get_size(t):
-            return self.from_scale + (self.to_scale - self.from_scale) * t/clip.duration
+            duration = self.duration or clip.duration
+            if t >= duration:
+                return self.to_scale
+            return self.from_scale + (self.to_scale - self.from_scale) * t/duration
         return clip.resized(get_size)
 
 

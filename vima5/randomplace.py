@@ -4,7 +4,7 @@ import random
 from PIL import Image
 import math
 
-def distribute_images(bg_width, bg_height, num_images, min_scale=0.1, max_scale=0.3, 
+def distribute_images(bg_width, bg_height, num_images, min_scale=0.5, max_scale=1.0, 
                       max_attempts=1000, coverage_target=0.99, three_pass=True):
     """
     Generate coordinates and scales for placing multiple images on a background
@@ -256,9 +256,7 @@ def distribute_images(bg_width, bg_height, num_images, min_scale=0.1, max_scale=
         temp_mask[y:y+height, x:x+width] = False
         
         # Try different expansion percentages
-        expansion_factors = [4.0, 3.9, 3.8, 3.7, 3.6, 3.5, 3.4, 3.3, 3.2, 3.1,
-                             3.0, 2.9, 2.8, 2.7, 2.6, 2.5, 2.4, 2.3, 2.2, 2.1,
-                             2.0, 1.9, 1.8, 1.7, 1.6, 1.5, 1.4, 1.3, 1.2, 1.1]
+        expansion_factors = [1.1, 1.0, 0.8, 0.7, 0.6]
         expanded = False
         
         for factor in expansion_factors:

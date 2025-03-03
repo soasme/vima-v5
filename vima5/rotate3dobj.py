@@ -7,6 +7,7 @@ import numpy as np
 import os
 from PIL import Image
 from moviepy import vfx, ImageSequenceClip
+from vima5.canva import *
 import tempfile
 import time
 
@@ -43,6 +44,7 @@ class ModelToGif(ShowBase):
         # Parse background color (hex to RGB)
         bg_hex = background_color.lstrip('#')
         bg_rgb = tuple(int(bg_hex[i:i+2], 16) for i in (0, 2, 4))
+        self.bg_rgb = bg_rgb
         self.bg_color = LColor(bg_rgb[0]/255.0, bg_rgb[1]/255.0, bg_rgb[2]/255.0, 1)
         
         # Set the background color to chroma key green
@@ -250,6 +252,9 @@ class ModelToGif(ShowBase):
         # Create a GIF from frames
         try:
             clip = ImageSequenceClip(frame_files, fps=self.fps)
+            clip = clip.with_effects([
+                RemoveColor(self.bg_rgb)
+            ])
 
             # Write the GIF
             clip.write_gif(self.output_path, fps=self.fps)
