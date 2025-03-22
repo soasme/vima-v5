@@ -19,7 +19,7 @@ movie = Movie()
 def parse_args():
     parser = argparse.ArgumentParser(description='Finger Family')
     parser.add_argument('--input-dir', type=str, help='Input Directory having all the images and config')
-    parser.add_argument('--output', type=str, help='Output video file', default='/tmp/output.mp4')
+    parser.add_argument('--output', type=str, help='Output video file', default='/tmp/balloonpop.mp4')
     parser.add_argument('--compile', action='store_true', help='Compile the video')
 
     args = parser.parse_args()
@@ -44,6 +44,16 @@ def make_page(config, idx):
     started_popping_at = intro_duration
 
     with movie.page(duration=total_duration, background='#ffffff') as page:
+        bg = config['objects'][idx].get('background')
+        if bg:
+            bg_clip = ImageClip(config['input_dir'] + '/' + bg)
+            page.elem(
+                (bg_clip.with_position('center')
+                .resized((CANVA_WIDTH, CANVA_HEIGHT))),
+                start=0,
+                duration=total_duration,
+            )
+
         obj_clip = ImageClip(config['input_dir'] + '/' + config['objects'][idx]['object'])
         w, h = obj_clip.w, obj_clip.h
         page.elem(
