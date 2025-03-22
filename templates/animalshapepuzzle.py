@@ -30,6 +30,7 @@ from vima5.canva import *
 from rembg import remove as rembg
 import random
 from typing import List, Tuple, Optional
+from elevenlabs.types import VoiceSettings
 
 from vima5.utils import mask_alpha
 from vima5.utils import make_voiceover, get_asset_path
@@ -37,6 +38,15 @@ from types import SimpleNamespace
 
 CANVA_WIDTH = 1920
 CANVA_HEIGHT = 1080
+VOICEOVER_MODEL = 'Natsumi'
+VOICEOVER_SETTINGS = VoiceSettings(
+    stability=0.9,
+    similarity_boost=0.5,
+    style=0.0,
+    speed=0.75,
+    use_speaker_boost=True
+)
+
 #FPS = 12
 FPS = 30
 
@@ -172,31 +182,36 @@ def distribute_images(
 def parse_args():
     parser = argparse.ArgumentParser(description='Finger Family')
     parser.add_argument('--input-dir', type=str, help='Input Directory having all the images and config')
-    parser.add_argument('--output', type=str, help='Output video file', default='/tmp/output.mp4')
+    parser.add_argument('--output', type=str, help='Output video file', default='/tmp/animalshapepuzzle.mp4')
     parser.add_argument('--compile', action='store_true', help='Compile the video')
 
     args = parser.parse_args()
     return args
 
-def get_image_path(input_dir, idx, name):
+def get_image_path(config, input_dir, idx, name):
+    if 'image' in config['animals'][idx]:
+        return '%s/%s' % (input_dir, config['animals'][idx]['image'])
     return '%s/build/%02d_%s.png' % (input_dir, idx+1, name.replace(' ', '').lower())
 
-def get_outline_path(input_dir, idx, name):
+def get_outline_path(config, input_dir, idx, name):
+    if 'image' in config['animals'][idx]:
+        return '%s/%s' % (input_dir, config['animals'][idx]['image'].replace('.png', '_black.png'))
     return '%s/build/%02d_%s_black.png' % (input_dir, idx+1, name.replace(' ', '').lower())
 
-def add_animal_outline(input_dir, main_char_idx, outline_idx, animal):
-    image_path = get_image_path(input_dir, outline_idx, animal['name'])
-    outline_path = get_outline_path(input_dir, outline_idx, animal['name'])
+def add_animal_outline(page, config, input_dir, main_char_idx, outline_idx, animal):
+    image_path = get_image_path(config, input_dir, outline_idx, animal['name'])
+    outline_path = get_outline_path(config, input_dir, outline_idx, animal['name'])
     image_pos = animal['pos']
     image_size = animal['size']
 
-    add_elem(
+    page.elem(
         ImageClip(outline_path if main_char_idx <= outline_idx else image_path)
         .resized(image_size)
         .with_position(image_pos),
     )
 
 def make_page(config, idx):
+    movie = Movie()
     move_in_duration = 5
     move_to_duration = 3
     congrats_duration = 2
@@ -205,118 +220,122 @@ def make_page(config, idx):
     revealed_at = move_in_duration
     congrats_at = move_in_duration + move_to_duration
 
-    add_page(
+    with movie.page(
         duration=total_duration,
         background='#ffffff',
-    )
-    add_elem(
-        ImageClip(config['input_dir'] + '/' + config['background'])
-        .resized((CANVA_WIDTH, CANVA_HEIGHT))
-    )
-
-    for j, animal in enumerate(config['animals']):
-        add_animal_outline(config['input_dir'], idx, j, animal)
-
-    main_character = config['animals'][idx]
-    image_clip = ImageClip(get_image_path(config['input_dir'], idx, main_character['name']))
-
-    add_elem(
-        image_clip
-        .with_duration(move_in_duration)
-        .with_effects([
-            vfx.SlideIn(1, side='left'),
-            Swing(-5, 5, 1),
-        ]),
-        start=started_at,
-        duration=move_in_duration,
-    )
-
-    movein_sound = 'magic-ascend-1-259521.mp3'
-    move_to_pos_sound = 'funny-pipe-effect-229173.mp3'
-    yay_sound = 'short-success-sound-glockenspiel-treasure-video-game-6346.mp3'
-
-    add_elem(
-        AudioFileClip(get_asset_path(movein_sound)),
-        start=started_at,
-        duration=3,
-    )
-
-    image_pos = int(main_character['pos'][0]), int(main_character['pos'][1])
-    image_size = int(main_character['size'][0]), int(main_character['size'][1])
-    init_pos = anchor_center(0, 0, CANVA_WIDTH, CANVA_HEIGHT, image_clip.w, image_clip.h)
-
-    add_elem(
-        AudioFileClip(get_asset_path(move_to_pos_sound)),
-        start=revealed_at,
-        duration=2,
-    )
-
-    add_elem(
-        image_clip
-        .with_duration(move_to_duration)
-        .with_effects([
-            UniformMotion(init_pos, image_pos),
-            UniformScale(1.0, image_size[0] / image_clip.w),
-        ])
-        ,
-        start=revealed_at,
-        duration=move_to_duration,
-    )
-
-    confetti = VideoFileClip(
-        get_asset_path('Confetti.gif'),
-        has_mask=True,
-    )
-    add_elem(
-        confetti
-        .with_start(congrats_at)
-        .with_position(anchor_center(
-            image_pos[0], image_pos[1],
-            main_character['size'][0], main_character['size'][1],
-            confetti.w, confetti.h,
-        )),
-        start=congrats_at,
-        duration=congrats_duration,
-    )
-    add_elem(
-        image_clip
-        .with_duration(2)
-        .with_position(image_pos)
-        .resized(main_character['size']),
-        start=congrats_at,
-        duration=congrats_duration,
-    )
-    add_elem(
-        AudioFileClip(get_asset_path(yay_sound)),
-        start=congrats_at,
-        duration=2,
-    )
-
-    add_elem(
-        TextClip(
-            text=main_character['name'],
-            font_size=200,
-            color='white',
-            stroke_color='black',
-            stroke_width=5,
-            margin=tuple([50, 50]),
-            font='Arial',
+        ) as page:
+        page.elem(
+            ImageClip(config['input_dir'] + '/' + config['background'])
+            .resized((CANVA_WIDTH, CANVA_HEIGHT))
         )
-        .with_position(('center', CANVA_HEIGHT - 400))
-        .with_duration(2)
-        .with_effects([
-            vfx.CrossFadeIn(0.5),
-        ]),
-        start=3,
-        duration=2,
-    )
-    voiceover_mp3 = make_voiceover(main_character['name'], 'Whimsy')
-    voiceover_clip = AudioFileClip(voiceover_mp3)
-    add_elem(
-        voiceover_clip,
-        start=3,
-        duration=voiceover_clip.duration,
-    )
+    
+        for j, animal in enumerate(config['animals']):
+            add_animal_outline(page, config, config['input_dir'], idx, j, animal)
+    
+        main_character = config['animals'][idx]
+        image_path = get_image_path(config, config['input_dir'], idx, main_character['name'])
+        image_clip = ImageClip(image_path)
+    
+        page.elem(
+            image_clip
+            .with_duration(move_in_duration)
+            .with_effects([
+                vfx.SlideIn(1, side='left'),
+                Swing(-5, 5, 1),
+            ]),
+            start=started_at,
+            duration=move_in_duration,
+        )
+    
+        movein_sound = 'magic-ascend-1-259521.mp3'
+        move_to_pos_sound = 'funny-pipe-effect-229173.mp3'
+        yay_sound = 'short-success-sound-glockenspiel-treasure-video-game-6346.mp3'
+    
+        page.elem(
+            AudioFileClip(get_asset_path(movein_sound)),
+            start=started_at,
+            duration=3,
+        )
+    
+        image_pos = int(main_character['pos'][0]), int(main_character['pos'][1])
+        image_size = int(main_character['size'][0]), int(main_character['size'][1])
+        init_pos = anchor_center(0, 0, CANVA_WIDTH, CANVA_HEIGHT, image_clip.w, image_clip.h)
+    
+        page.elem(
+            AudioFileClip(get_asset_path(move_to_pos_sound)),
+            start=revealed_at,
+            duration=2,
+        )
+    
+        page.elem(
+            image_clip
+            .with_duration(move_to_duration)
+            .with_effects([
+                UniformMotion(init_pos, image_pos),
+                UniformScale(1.0, image_size[0] / image_clip.w),
+            ])
+            ,
+            start=revealed_at,
+            duration=move_to_duration,
+        )
+    
+        confetti = VideoFileClip(
+            get_asset_path('Confetti.gif'),
+            has_mask=True,
+        )
+        page.elem(
+            confetti
+            .with_start(congrats_at)
+            .with_position(anchor_center(
+                image_pos[0], image_pos[1],
+                main_character['size'][0], main_character['size'][1],
+                confetti.w, confetti.h,
+            )),
+            start=congrats_at,
+            duration=congrats_duration,
+        )
+        page.elem(
+            image_clip
+            .with_duration(2)
+            .with_position(image_pos)
+            .resized(main_character['size']),
+            start=congrats_at,
+            duration=congrats_duration,
+        )
+        page.elem(
+            AudioFileClip(get_asset_path(yay_sound)),
+            start=congrats_at,
+            duration=2,
+        )
+    
+        page.elem(
+            TextClip(
+                text=main_character['name'],
+                font_size=200,
+                color='white',
+                stroke_color='black',
+                stroke_width=5,
+                margin=tuple([50, 50]),
+                font='Arial',
+            )
+            .with_position(('center', CANVA_HEIGHT - 400))
+            .with_duration(2)
+            .with_effects([
+                vfx.CrossFadeIn(0.5),
+            ]),
+            start=3,
+            duration=2,
+        )
+        voiceover_mp3 = make_voiceover(main_character['name'], VOICEOVER_MODEL)
+        voiceover_clip = AudioFileClip(voiceover_mp3)
+        page.elem(
+            voiceover_clip,
+            start=3,
+            duration=voiceover_clip.duration,
+        )
+
+    output = config['output'].replace('.mp4', f'_{idx+1}.mp4')
+    movie.render(output, fps=FPS)
 
 def generate_config(args, config):
     files = sorted(os.listdir(args.input_dir))
@@ -378,14 +397,12 @@ def main():
         config = json.load(f)
 
     config['input_dir'] = args.input_dir
+    config['output'] = args.output
 
     for i in range(len(config['animals'])):
-        make_page(config, i)
+        if i > 11:
+            make_page(config, i)
 
-    if args.compile:
-        render_pages(args.output, fps=FPS)
-    else:
-        render_each_page(args.output, fps=FPS)
 
 if __name__ == '__main__':
     main()

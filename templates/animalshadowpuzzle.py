@@ -133,17 +133,26 @@ def page_congrats(movie, config, idx):
     total_duration = init_padding_duration + congrats_duration + end_padding_duration
 
     with movie.page(duration=total_duration, background=que_background) as page:
-        bg = ImageClip(get_asset_path('ExclamationBackground.png'))
-        page.elem(
-            bg
-            .with_duration(total_duration)
-            .with_duration(total_duration)
-            .with_opacity(0.5)
-            .with_position((0, -420))
-            .with_effects([
-                UniformMotion((0, -420), (0, 0))
-            ])
-        )
+        bg = config['objects'][idx].get('congrats_background') or 'ExclamationBackground.png'
+        if bg.endswith('.png'):
+            bg_clip = (
+                ImageClip(get_asset_path(bg))
+                .with_opacity(0.5)
+                .with_position((0, -420))
+                .with_effects([
+                    UniformMotion((0, -420), (0, 0))
+                ])
+            )
+
+        elif bg.endswith('.mp4'):
+            bg_clip = (
+                VideoFileClip(get_asset_path(bg))
+                .resized((CANVA_WIDTH, CANVA_HEIGHT))
+            )
+        else:
+            raise ValueError('Invalid background type: ' + bg)
+
+        page.elem(bg_clip.with_duration(total_duration))
 
         obj_clip = (
             ImageClip(get_build_path(config['objects'][idx]['image']))
@@ -402,7 +411,7 @@ def gen_level(config, idx):
     page_congrats(movie, config, idx)
     page_puzzle(movie, config, idx)
     page_funfact(movie, config, idx)
-    movie.render(f'/tmp/animalshadowpuzzle{idx}.mp4', fps=FPS)
+    movie.render(f'/tmp/animalshadowpuzzle{idx}.mp4', fps=FPS, )
 
 def main():
     args = parse_args()
@@ -416,8 +425,6 @@ def main():
     gen_voiceovers(config)
 
     for idx, obj in enumerate(config['objects']):
-        if idx < 18:
-            continue
         gen_level(config, idx)
 
 
