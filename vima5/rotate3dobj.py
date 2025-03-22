@@ -252,9 +252,9 @@ class ModelToGif(ShowBase):
         # Create a GIF from frames
         try:
             clip = ImageSequenceClip(frame_files, fps=self.fps)
-            clip = clip.with_effects([
-                RemoveColor(self.bg_rgb)
-            ])
+            #clip = clip.with_effects([
+            #    RemoveColor(self.bg_rgb)
+            #])
 
             # Write the GIF
             clip.write_gif(self.output_path, fps=self.fps)

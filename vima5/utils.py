@@ -326,13 +326,21 @@ def make_rembg(image):
 elevenlabs_api_key = os.environ.get('ELEVENLABS_API_KEY') or ''
 VOICES = {
     'Brian': 'nPczCjzI2devNBz1zQrb',
-    'Whimsy': '542jzeOaLKbcpZhWfJDa',
     'Alice': 'Xb7hH8MSUJpSbSDYk0k2',
     'Bella': 'jF58wCtan46ecp8biibj',
     'Jessica': 'lxYfHSkYm1EzQzGhdbfc',
     'Bill': 'pqHfZKP75CvOlQylNhV4',
     'Lily': 'pFZP5JQG7iQjIQuC4Bku',
     'Daniel': 'onwK4e9ZLuTAKqWW03F9',
+    'Natsumi': 'vHHbGTOpiYVBAckPY1IO', # host
+    'Whimsy': '542jzeOaLKbcpZhWfJDa',
+    'Halley': 'eBvoGh8YGJn1xokno71w', # host, drama
+    'KawaiiAerisita': 'vGQNBgLaiM3EdZtxIiuY', # drama
+    'FreddyFox': 'KSb3AygB8nlskHweRc7e', # drama
+    'Fredi': 'niWq5MaoVuyqimv1YYmn', # drama
+    'SimonJ': 'mKYyBSIQcY1JmQlvU7CG', # drama
+    'Daria': '9XfYMbJVZqPHaQtYnTAO', # drama
+    'Cody': '9XfYMbJVZqPHaQtYnTAO', # host, drama
     'Arthur': 'TtRFBnwQdH1k01vR0hMz', # default
 }
 TTS_MODEL = 'eleven_flash_v2_5'
