@@ -202,8 +202,6 @@ def main():
         os.makedirs(build_dir)
 
     for i in range(len(config['objects'])):
-        if i != 7:
-            continue
         make_page(config, i)
 
     if args.compile:

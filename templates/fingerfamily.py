@@ -43,6 +43,8 @@ DEFAULT_CONFIG = {
 
 CANVA_WIDTH = 1920
 CANVA_HEIGHT = 1080
+#FPS = 12
+FPS = 60
 
 HAND_POS = {
     'PlushHand.png': (346, 170),
@@ -154,7 +156,7 @@ def make_object_page(context, duration, obj, background,  prev_background=None, 
 
 
 
-def make_finger_page(context, duration, obj, hand, finger, background, prev_background=None, text='', bg_slide_in=0.0):
+def make_finger_page(context, duration, obj, hand, finger, background, prev_background=None, text='', bg_slide_in=0.0, audiences=None):
     add_page(
         duration=duration,
         background='#ffffff',
@@ -176,6 +178,26 @@ def make_finger_page(context, duration, obj, hand, finger, background, prev_back
         ImageClip(background)
         .with_effects(bg_effects)
     )
+
+    if audiences:
+        # assume audiences is 16:9, 1920x1080
+        audience_positions = [
+            (0-100, 0),
+            (960+100, 0),
+            (0-100, 540),
+            (960+100, 540),
+        ]
+        for index, audience in enumerate(audiences):
+            pos = audience_positions[index]
+            add_elem(
+                ImageClip(audience)
+                .with_position(pos)
+                .with_effects([
+                    vfx.Resize((960, 540)),
+                    SquishBounceEffect(),
+                ])
+            )
+
 
     hand_anchor = HAND_ANCHORS[os.path.basename(hand)][finger]
     hand_pos = HAND_POS[os.path.basename(hand)]
@@ -254,6 +276,12 @@ def main():
                 hand=get_asset_path(page.get('hand', 'VectorHand.png')),
                 finger=page['finger'],
                 background=f"{args.input_dir}/{page['background']}",
+                audiences=set([
+                    get_asset_path(audience['object'])
+                    for audience in
+                    (pages[0:10] if index < 10 else pages[10:20])
+                    if audience['finger'] != page['finger']
+                ]),
                 prev_background=(
                     f"{args.input_dir}/{page.get('prev_background')}"
                     if page.get('prev_background')
@@ -263,9 +291,9 @@ def main():
                 text=page.get('text', ''),
             )
     if args.compile:
-        render_pages(args.output, fps=30)
+        render_pages(args.output, fps=FPS)
     else:
-        render_each_page(args.output, fps=30)
+        render_each_page(args.output, fps=FPS)
 
 if __name__ == '__main__':
     main()
