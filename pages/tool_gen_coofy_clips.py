@@ -1,5 +1,10 @@
+# TODO:
+# Auto generate song/song style/image prompts for the each video types.
+# Adapt all existing video types to this tool.
+
 import os
 import json
+import re
 import streamlit as st
 import tarfile
 import shutil
@@ -16,6 +21,14 @@ from io import BytesIO
 from pathlib import Path
 
 PROJECT_DIR = '/tmp/vima5'
+
+
+def sort_by_number(filenames):
+    def extract_number(filename):
+        match = re.search(r'output-(\d+)\.mp4', filename)
+        return int(match.group(1)) if match else float('inf')
+
+    return sorted(filenames, key=extract_number)
 
 def clean_old_projects():
     """Delete project directories older than 24 hours"""
@@ -123,7 +136,7 @@ if 'is_generating' not in st.session_state:
 if 'generation_process' not in st.session_state:
     st.session_state.generation_process = None
 
-st.title('Balloon Pop Video Generator')
+st.title('Coofy Video Generator')
 
 # Project ID input
 project_id = st.text_input('Project ID', value=st.query_params.get('project_id') or '')
@@ -201,7 +214,7 @@ if project_id and uploaded_files:
     for filename in os.listdir(build_dir):
         file_path = os.path.join(build_dir, filename)
         if os.path.isfile(file_path) and not filename.startswith('output') and not filename == 'config.json':
-            files.append({"filename": filename, "preview": get_image_ppreview(file_path)})
+            files.append({"filename": filename, "preview": get_image_preview(file_path)})
     
     st.session_state.file_table = pd.DataFrame(files)
 
@@ -297,7 +310,7 @@ if project_id and os.path.exists(build_dir):
     if output_files:
         st.write('### Generated Videos')
         
-        for file_path in sorted(output_files):
+        for file_path in sort_by_number(output_files):
             file_name = os.path.basename(file_path)
             create_time = datetime.datetime.fromtimestamp(os.path.getctime(file_path))
             
