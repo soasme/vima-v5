@@ -12,7 +12,7 @@ from types import SimpleNamespace
 CANVA_WIDTH = 1920
 CANVA_HEIGHT = 1080
 #FPS = 12
-FPS = 30
+FPS = 60
 
 movie = Movie()
 
@@ -56,6 +56,9 @@ def make_page(config, idx):
 
         obj_clip = ImageClip(config['input_dir'] + '/' + config['objects'][idx]['object'])
         w, h = obj_clip.w, obj_clip.h
+        if 'object_scale' in config['objects'][idx]:
+            obj_clip = obj_clip.resized(config['objects'][idx]['object_scale'])
+            w, h = obj_clip.w, obj_clip.h
         page.elem(
             obj_clip
             .with_position(anchor_center(0, 0, CANVA_WIDTH, CANVA_HEIGHT, w, h))

@@ -8,11 +8,18 @@ Example config:
     "background": "c01a.png",
     "finger": 0,
     "duration": 2.5,
-    "prev_background": "intro.png",
     "text": "ABC"
   },
   {
     "type": "object",
+    "object": "w01.png",
+    "background": "c01b.png",
+    "finger": 0,
+    "duration": 3.1,
+    "text": "XYZ"
+  },
+  {
+    "type": "finger_and_object",
     "object": "w01.png",
     "background": "c01b.png",
     "finger": 0,
