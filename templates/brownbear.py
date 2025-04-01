@@ -94,7 +94,7 @@ def make_answer(config, idx):
         if 'next_image' in config['clips'][idx]:
             next_image_clip = ImageClip(
                 get_asset_path(config['clips'][idx]['next_image'])
-            )
+            ).resized((CANVA_WIDTH, CANVA_HEIGHT))
         else:
             next_image_clip = get_image_clip(config, (idx + 1) % len(config['clips']))
         image_one_side_pos = (-CANVA_WIDTH/2, 0) if idx % 2 == 0 else (CANVA_WIDTH/2, 0)
