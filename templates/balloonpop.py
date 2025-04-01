@@ -36,15 +36,15 @@ def make_page(config, idx):
     congrats_asset = config.get('congrats_asset') or 'Confetti2.gif'
     congrats_duration = config.get('congrats_duration') or 1.2
     balloons_count = config.get('balloons_count') or 40
-    intro_duration = config['objects'][idx].get('intro_duration') or 2
-    pop_duration = config['objects'][idx].get('pop_duration') or 8
-    outtro_duration = config['objects'][idx].get('outtro_duration') or 4
+    intro_duration = config['clips'][idx].get('intro_duration') or 2
+    pop_duration = config['clips'][idx].get('pop_duration') or 8
+    outtro_duration = config['clips'][idx].get('outtro_duration') or 4
     total_duration = intro_duration + pop_duration + outtro_duration
     started_at = 0
     started_popping_at = intro_duration
 
     with movie.page(duration=total_duration, background='#ffffff') as page:
-        bg = config['objects'][idx].get('background')
+        bg = config['clips'][idx].get('background')
         if bg:
             bg_clip = ImageClip(config['input_dir'] + '/' + bg)
             page.elem(
@@ -54,10 +54,10 @@ def make_page(config, idx):
                 duration=total_duration,
             )
 
-        obj_clip = ImageClip(config['input_dir'] + '/' + config['objects'][idx]['object'])
+        obj_clip = ImageClip(config['input_dir'] + '/' + config['clips'][idx]['object'])
         w, h = obj_clip.w, obj_clip.h
-        if 'object_scale' in config['objects'][idx]:
-            obj_clip = obj_clip.resized(config['objects'][idx]['object_scale'])
+        if 'object_scale' in config['clips'][idx]:
+            obj_clip = obj_clip.resized(config['clips'][idx]['object_scale'])
             w, h = obj_clip.w, obj_clip.h
         page.elem(
             obj_clip
@@ -147,7 +147,7 @@ def main():
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
 
-    for i in range(len(config['objects'])):
+    for i in range(len(config['clips'])):
         make_page(config, i)
 
     if args.compile:

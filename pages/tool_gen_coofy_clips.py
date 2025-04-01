@@ -168,7 +168,7 @@ if project_id:
     files = []
     for filename in os.listdir(build_dir):
         file_path = os.path.join(build_dir, filename)
-        if os.path.isfile(file_path) and not filename.startswith('output') and not filename == 'config.json':
+        if os.path.isfile(file_path) and not filename.startswith('output') and ('.png' in filename or '.jpg' in filename or '.gif' in filename):
             files.append({"filename": filename, "preview": get_image_preview(file_path)})
     
     st.session_state.file_table = pd.DataFrame(files)
@@ -189,7 +189,7 @@ if project_id and config_text:
         config = json.loads(config_text)
         config['input_dir'] = build_dir
         config['output'] = f'{build_dir}/output.mp4'
-        config['compile'] = False
+        config['compile'] = config.get('compile', False)
         config['video_type'] = video_type
         
         # Save config to session state
@@ -213,7 +213,7 @@ if project_id and uploaded_files:
     files = []
     for filename in os.listdir(build_dir):
         file_path = os.path.join(build_dir, filename)
-        if os.path.isfile(file_path) and not filename.startswith('output') and not filename == 'config.json':
+        if os.path.isfile(file_path) and not filename.startswith('output') and ('.png' in filename or '.jpg' in filename or '.gif' in filename):
             files.append({"filename": filename, "preview": get_image_preview(file_path)})
     
     st.session_state.file_table = pd.DataFrame(files)

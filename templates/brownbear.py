@@ -36,13 +36,13 @@ def calculate_position(direction, type):
         return (0, 0), (CANVA_WIDTH/2, 0)
 
 def get_image_clip(config, idx):
-    img_path = get_asset_path(config['objects'][idx]['image'])
+    img_path = get_asset_path(config['clips'][idx]['image'])
     img = Image.open(img_path) if idx % 2 == 0 else ImageOps.mirror(Image.open(img_path))
     clip = ImageClip(np.array(img)).resized((CANVA_WIDTH, CANVA_HEIGHT))
     return clip
 
 def make_question(config, idx):
-    total_duration = config['objects'][idx].get('question_duration') or 4
+    total_duration = config['clips'][idx].get('question_duration') or 4
     with movie.page(duration=total_duration, background='#ffffff') as page:
         image_clip = get_image_clip(config, idx)
         page.elem(
@@ -57,9 +57,11 @@ def make_question(config, idx):
         )
         page.elem(
             TextClip(
-                text=config['objects'][idx]['question_text'],
+                text=config['clips'][idx]['question_text'],
                 font_size=80,
                 color='black',
+                stroke_color='#ffffff',
+                stroke_width=2,
                 margin=tuple([50, 50]),
                 font='Arial',
             )
@@ -86,15 +88,15 @@ def make_answer(config, idx):
     # idx % 2 == 0: outside pos: -1920, 0
     # idx % 2 == 1: outside pos: 1920, 0
     # idx % 2 == 1: apply MirrorX() effect to image_clip
-    total_duration = config['objects'][idx].get('answer_duration') or 4
+    total_duration = config['clips'][idx].get('answer_duration') or 4
     with movie.page(duration=total_duration, background='#ffffff') as page:
         image_clip = get_image_clip(config, idx)
-        if 'next_image' in config['objects'][idx]:
+        if 'next_image' in config['clips'][idx]:
             next_image_clip = ImageClip(
-                get_asset_path(config['objects'][idx]['next_image'])
+                get_asset_path(config['clips'][idx]['next_image'])
             )
         else:
-            next_image_clip = get_image_clip(config, (idx + 1) % len(config['objects']))
+            next_image_clip = get_image_clip(config, (idx + 1) % len(config['clips']))
         image_one_side_pos = (-CANVA_WIDTH/2, 0) if idx % 2 == 0 else (CANVA_WIDTH/2, 0)
         image_the_other_side_pos = (CANVA_WIDTH/2, 0) if idx % 2 == 0 else (-CANVA_WIDTH/2, 0)
         image_outside_pos = (-CANVA_WIDTH, 0) if idx % 2 == 0 else (CANVA_WIDTH, 0)
@@ -164,7 +166,7 @@ def make_answer(config, idx):
         )
         page.elem(
             TextClip(
-                text=config['objects'][idx]['answer_text'],
+                text=config['clips'][idx]['answer_text'],
                 font_size=80,
                 color='black',
                 margin=tuple([50, 50]),
@@ -201,7 +203,7 @@ def main():
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
 
-    for i in range(len(config['objects'])):
+    for i in range(len(config['clips'])):
         make_page(config, i)
 
     if args.compile:
