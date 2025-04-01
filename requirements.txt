@@ -12,7 +12,7 @@ Pillow
 librosa
 elevenlabs
 rembg
-#onnxruntime
+onnxruntime
 playwright
 diskcache
 #vidgear
