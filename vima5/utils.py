@@ -8,7 +8,7 @@ from openai import OpenAI
 from rembg import remove as rembg
 from tempfile import NamedTemporaryFile
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFont
 from elevenlabs.client import ElevenLabs
 from elevenlabs import save as save_voiceover
 import diskcache as dc
@@ -51,6 +51,8 @@ RESOLUTION_MAP = {
         '1:1': (480, 480),
     },
 }
+
+DEFAULT_FONT = 'Arial'
 
 def get_openai_client():
     return OpenAI(api_key=st.session_state.openai_key)

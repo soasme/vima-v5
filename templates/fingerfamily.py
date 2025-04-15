@@ -341,6 +341,74 @@ def make_finger_and_object_page(context, duration, obj, hand, finger, background
                 ])
             )
 
+def make_all_fingers_page(context, duration, objects, hand, background, prev_background=None, text='', text_size=70, bg_slide_in=0.0):
+    with movie.page(
+            duration=duration,
+            background='#ffffff',
+            ) as page:
+
+        if prev_background:
+            page.elem(
+                ImageClip(prev_background)
+                .with_effects([
+                    vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT)),
+                ])
+            )
+    
+        bg_effects = [vfx.Resize((CANVA_WIDTH, CANVA_HEIGHT))]
+        if prev_background and bg_slide_in:
+            bg_effects.append(vfx.SlideIn(bg_slide_in, side='right'))
+    
+        page.elem(
+            ImageClip(background)
+            .with_effects(bg_effects)
+        )
+    
+        hand_center = HAND_CENTERS[os.path.basename(hand)]
+        hand_img = Image.open(hand)
+        
+        for finger, obj in enumerate(objects):
+            hand_anchor = HAND_ANCHORS[os.path.basename(hand)][finger]
+            objimg = Image.open(obj)
+            objimg = objimg.resize((int(objimg.width * 0.2), int(objimg.height * 0.2)))
+            point = (
+                int(hand_anchor[0] - objimg.size[0]/2),
+                int(hand_anchor[1] - objimg.size[1]/2),
+            )
+            paste_non_transparent(objimg, hand_img, point)
+        
+        hand_clip = ImageClip(np.array(hand_img))
+        hand_clip = hand_clip.with_position(HAND_POS[os.path.basename(hand)])
+        page.elem(
+            hand_clip.with_effects([
+                Swing(
+                    start_angle=-5,
+                    end_angle=5,
+                    period=1,
+                    center=hand_center,
+                )
+            ])
+        )
+    
+        if text:
+            text_clip = TextClip(
+                font='Arial',
+                text=text,
+                font_size=text_size,
+                color='#ffffff',
+                stroke_color='#000000',
+                stroke_width=5,
+                margin=(10, 10),
+            )
+            page.elem(
+                text_clip
+                .with_duration(duration)
+                .with_position(('center', CANVA_HEIGHT-100))
+                .with_effects([
+                    vfx.CrossFadeIn(1),
+                ])
+            )
+
 def make_page(config, index):
     pages = config['clips']
     page = config['clips'][index]
@@ -392,6 +460,25 @@ def make_page(config, index):
             obj=f"{config['input_dir']}/{obj}",
             hand=get_asset_path(page.get('hand', 'VectorHand.png')),
             finger=page['finger'],
+            background=f"{config['input_dir']}/{page['background']}",
+            prev_background=(
+                f"{config['input_dir']}/{page.get('prev_background')}"
+                if page.get('prev_background')
+                else
+                f"{config['input_dir']}/{config['clips'][index-1]['background']}"
+            ),
+            text=page.get('text', ''),
+            text_size=page.get('text_size', 70),
+        )
+    elif page['type'] == 'all_fingers':
+        make_all_fingers_page(
+            config,
+            page['duration'],
+            objects=[
+                get_asset_path(obj)
+                for obj in config['clips'][index]['objects']
+            ],
+            hand=get_asset_path(page.get('hand', 'VectorHand.png')),
             background=f"{config['input_dir']}/{page['background']}",
             prev_background=(
                 f"{config['input_dir']}/{page.get('prev_background')}"

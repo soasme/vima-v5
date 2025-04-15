@@ -6,7 +6,7 @@ import argparse
 from PIL import Image, ImageOps, ImageFilter
 from moviepy import *
 from vima5.canva import *
-from vima5.utils import make_voiceover, get_asset_path, get_build_path
+from vima5.utils import make_voiceover, get_asset_path, get_build_path, DEFAULT_FONT
 from types import SimpleNamespace
 
 CANVA_WIDTH = 1920
@@ -55,6 +55,7 @@ def make_question(config, idx):
             start=0,
             duration=total_duration,
         )
+        # TODO: replace with subtitle clip
         page.elem(
             TextClip(
                 text=config['clips'][idx]['question_text'],
@@ -63,7 +64,7 @@ def make_question(config, idx):
                 stroke_color='#ffffff',
                 stroke_width=2,
                 margin=tuple([50, 50]),
-                font='Arial',
+                font=DEFAULT_FONT,
             )
             .with_position(('center', CANVA_HEIGHT - 200))
             .with_duration(total_duration)
@@ -170,7 +171,7 @@ def make_answer(config, idx):
                 font_size=80,
                 color='black',
                 margin=tuple([50, 50]),
-                font='Arial',
+                font=DEFAULT_FONT,
             )
             .with_position(('center', CANVA_HEIGHT - 200))
             .with_duration(total_duration)

@@ -26,3 +26,5 @@ pyperclip
 cairosvg
 #panda3d
 #panda3d-gltf
+stable-ts
+mcp[cli]

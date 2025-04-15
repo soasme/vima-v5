@@ -316,7 +316,7 @@ if project_id and os.path.exists(build_dir):
             
             st.write(f"**{file_name}** (Created: {create_time})")
             st.video(file_path)
-            
+
             with open(file_path, "rb") as f:
                 st.download_button(
                     label=f"Download {file_name}",
@@ -324,4 +324,9 @@ if project_id and os.path.exists(build_dir):
                     file_name=file_name,
                     mime="video/mp4"
                 )
+
+            if st.button(f'Delete {file_name}'):
+                os.remove(file_path)
+                st.success(f"Deleted {file_name}")
+
             st.write("---")
